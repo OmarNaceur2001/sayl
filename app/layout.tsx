@@ -1,38 +1,55 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import {
+  DM_Mono,
+  Geist,
+  IBM_Plex_Sans_Arabic,
+  Instrument_Serif,
+  Inter,
+} from "next/font/google";
 import "./globals.css";
+import "./sayl-theme.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument-serif",
+});
+const dmMono = DM_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-dm-mono",
+});
+const ibmPlexArabic = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-ibm-plex-arabic",
+});
 
 export const metadata: Metadata = {
   title: {
-    default: "ZernFlow - The Open Source ManyChat Alternative",
-    template: "%s | ZernFlow",
+    default: "Sayl — Social messaging automation for teams",
+    template: "%s | Sayl",
   },
   description:
-    "Automate DMs, comments, and flows across Instagram, Facebook, WhatsApp, Telegram, X, Bluesky, and Reddit. Free, self-hostable, and open source.",
-  metadataBase: new URL("https://zernflow.com"),
+    "Automatisez vos conversations sociales, vos messages privés et vos workflows avec Sayl.",
   openGraph: {
-    title: "ZernFlow - The Open Source ManyChat Alternative",
-    description:
-      "Automate DMs, comments, and flows across Instagram, Facebook, WhatsApp, Telegram, X, Bluesky, and Reddit. Free, self-hostable, and open source.",
-    url: "https://zernflow.com",
-    siteName: "ZernFlow",
+    title: "Sayl — Social messaging automation for teams",
+    description: "Automatisez vos conversations sociales et vos workflows avec Sayl.",
+    siteName: "Sayl",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ZernFlow - The Open Source ManyChat Alternative",
+    title: "Sayl — Social messaging automation for teams",
     description:
-      "Automate DMs, comments, and flows across 7 platforms. Free, self-hostable, open source.",
+      "Automatisez les conversations sur plusieurs plateformes sociales avec Sayl.",
   },
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-    ],
-    apple: "/apple-touch-icon.png",
+    icon: "/sayl-mark.svg",
+    apple: "/sayl-mark.svg",
   },
 };
 
@@ -42,15 +59,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${geist.variable} ${instrumentSerif.variable} ${dmMono.variable} ${ibmPlexArabic.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem("theme")==="dark"||(!localStorage.getItem("theme")&&matchMedia("(prefers-color-scheme:dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`,
+            __html: `try{if(localStorage.getItem("theme")==="dark")document.documentElement.classList.add("dark")}catch(e){}`,
           }}
         />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body
+        className={`${inter.className}`}
+      >
+        {children}
+      </body>
     </html>
   );
 }

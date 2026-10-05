@@ -60,8 +60,8 @@ export function AcceptInviteView({
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <Image
-            src="/logo.png"
-            alt="ZernFlow"
+            src="/sayl-mark.svg"
+            alt="Sayl"
             width={48}
             height={48}
             className="mx-auto mb-3"

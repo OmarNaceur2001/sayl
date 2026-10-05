@@ -17,13 +17,4 @@ CREATE POLICY "Users can update broadcast recipients" ON broadcast_recipients
     )
   );
 
--- Fix scheduled_jobs: add full CRUD policies for workspace members
--- Jobs are workspace-agnostic (system-level), so allow authenticated users
-CREATE POLICY "Authenticated users can insert jobs" ON scheduled_jobs
-  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Authenticated users can read jobs" ON scheduled_jobs
-  FOR SELECT USING (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Authenticated users can update jobs" ON scheduled_jobs
-  FOR UPDATE USING (auth.uid() IS NOT NULL);
+-- scheduled_jobs is system-level; keep access restricted to service-role code.
