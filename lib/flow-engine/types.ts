@@ -1,4 +1,5 @@
 import type { NodeType, Platform } from "@/lib/types/database";
+import type { LanguageTranslations } from "@/lib/language/pick-text";
 
 export interface FlowNode {
   id: string;
@@ -45,10 +46,12 @@ export interface TriggerNodeData {
 export interface SendMessageNodeData {
   messages: Array<{
     text?: string;
+    translations?: LanguageTranslations;
     imageUrl?: string;
-    quickReplies?: Array<{ title: string; payload: string }>;
+    quickReplies?: Array<{ title: string; translations?: LanguageTranslations; payload: string }>;
     buttons?: Array<{
       title: string;
+      translations?: LanguageTranslations;
       type: "postback" | "url";
       payload?: string;
       url?: string;
@@ -57,10 +60,13 @@ export interface SendMessageNodeData {
       elements: Array<{
         imageUrl?: string;
         title: string;
+        translations?: LanguageTranslations;
         subtitle?: string;
+        subtitleTranslations?: LanguageTranslations;
         buttons?: Array<{
           type: "postback" | "url";
           title: string;
+          translations?: LanguageTranslations;
           payload?: string;
           url?: string;
         }>;
@@ -126,11 +132,13 @@ export interface SubscribeNodeData {
 export interface CommentReplyNodeData {
   /** Text to reply to the comment with. Supports {{variable}} interpolation. */
   text: string;
+  translations?: LanguageTranslations;
 }
 
 export interface PrivateReplyNodeData {
   /** Text to send as a private DM to the commenter. Supports {{variable}} interpolation. */
   text: string;
+  translations?: LanguageTranslations;
   imageUrl?: string;
 }
 
@@ -172,6 +180,6 @@ export interface FlowExecutionContext {
     callbackData?: string;
     sender?: { id: string; name?: string; username?: string };
   };
-  variables?: Record<string, string>;
+  variables?: Record<string, unknown>;
   platform?: Platform;
 }

@@ -23,7 +23,7 @@ import { ArrowLeft, Save, Rocket, Loader2, History, Play, Download, Trash2 } fro
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { createClient } from "@/lib/supabase/client";
-import type { Database, FlowStatus, Json } from "@/lib/types/database";
+import type { Database, FlowStatus, Json, SupportedLanguage } from "@/lib/types/database";
 
 import { NodePalette } from "./node-palette";
 import { TriggerNode } from "./nodes/trigger-node";
@@ -49,6 +49,7 @@ const nodeTypes: NodeTypes = {
 
 interface FlowCanvasProps {
   flow: Flow;
+  enabledLanguages?: SupportedLanguage[];
 }
 
 let nodeId = 0;
@@ -75,7 +76,7 @@ function getDefaultData(type: string, actionType?: string): Record<string, unkno
   }
 }
 
-function FlowCanvasInner({ flow }: FlowCanvasProps) {
+function FlowCanvasInner({ flow, enabledLanguages = ["fr", "en", "ar", "tn"] }: FlowCanvasProps) {
   const router = useRouter();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
@@ -259,6 +260,29 @@ function FlowCanvasInner({ flow }: FlowCanvasProps) {
     }
   }, [flow.id, router]);
   const handlePublish = useCallback(async () => {
+    const languagesMissingTranslations = nodes.flatMap((node) => {
+      if (node.type !== "sendMessage") return [];
+      const messages = (node.data as { messages?: Array<{ text?: string; translations?: Partial<Record<SupportedLanguage, string>> }> }).messages ?? [];
+      return messages.flatMap((message, index) => {
+        const missing = enabledLanguages.filter(
+          (language) =>
+            !(message.translations?.[language] ??
+              (language === "fr" ? message.text : undefined))?.trim()
+        );
+        return missing.length
+          ? [`Message ${index + 1}: ${missing.map((language) => language.toUpperCase()).join(", ")}`]
+          : [];
+      });
+    });
+    if (
+      languagesMissingTranslations.length > 0 &&
+      !window.confirm(
+        `Some messages are missing translations for enabled workspace languages:\n${languagesMissingTranslations.join("\n")}\n\nPublish anyway?`
+      )
+    ) {
+      return;
+    }
+
     setPublishing(true);
     try {
       // First save the current state
@@ -279,7 +303,7 @@ function FlowCanvasInner({ flow }: FlowCanvasProps) {
     } finally {
       setPublishing(false);
     }
-  }, [saveFlow, flow.id]);
+  }, [enabledLanguages, nodes, saveFlow, flow.id]);
 
   return (
     <div className="flex h-full flex-col">
@@ -503,10 +527,10 @@ function FlowCanvasInner({ flow }: FlowCanvasProps) {
   );
 }
 
-export function FlowCanvas({ flow }: FlowCanvasProps) {
+export function FlowCanvas({ flow, enabledLanguages }: FlowCanvasProps) {
   return (
     <ReactFlowProvider>
-      <FlowCanvasInner flow={flow} />
+      <FlowCanvasInner flow={flow} enabledLanguages={enabledLanguages} />
     </ReactFlowProvider>
   );
 }

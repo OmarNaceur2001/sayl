@@ -23,7 +23,7 @@ export default async function FlowEditorPage({
 
   return (
     <div className="flex h-full flex-col">
-      <FlowCanvas flow={flow} />
+      <FlowCanvas flow={flow} enabledLanguages={workspace.enabled_languages} />
     </div>
   );
 }

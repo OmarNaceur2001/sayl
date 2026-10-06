@@ -45,7 +45,7 @@ function getFlowVariables({
   nodes: Node[];
   edges: Edge[];
 }): string[] {
-  const variables = ["message"];
+  const variables = ["message", "contact.language"];
 
   const triggerNode = nodes.find((n) => n.type === "trigger");
   const triggerType = (triggerNode?.data as Record<string, unknown> | undefined)

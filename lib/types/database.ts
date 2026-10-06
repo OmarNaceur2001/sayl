@@ -55,6 +55,8 @@ export type NodeType =
 
 export type SequenceStatus = "draft" | "active" | "paused";
 export type SequenceEnrollmentStatus = "active" | "completed" | "cancelled";
+export type SupportedLanguage = "fr" | "en" | "ar" | "tn";
+export type LanguageSource = "detected" | "manual" | "default";
 
 export interface SequenceStep {
   type: "message" | "delay";
@@ -74,6 +76,8 @@ export interface Database {
           slug: string;
           ai_provider: string;
           global_keywords: Json | null;
+          default_language: SupportedLanguage;
+          enabled_languages: SupportedLanguage[];
           created_at: string;
           updated_at: string;
         };
@@ -83,6 +87,8 @@ export interface Database {
           slug: string;
           ai_provider?: string;
           global_keywords?: Json | null;
+          default_language?: SupportedLanguage;
+          enabled_languages?: SupportedLanguage[];
           created_at?: string;
           updated_at?: string;
         };
@@ -92,6 +98,8 @@ export interface Database {
           slug?: string;
           ai_provider?: string;
           global_keywords?: Json | null;
+          default_language?: SupportedLanguage;
+          enabled_languages?: SupportedLanguage[];
           updated_at?: string;
         };
         Relationships: [];
@@ -235,6 +243,9 @@ export interface Database {
           is_subscribed: boolean;
           last_interaction_at: string | null;
           metadata: Json | null;
+          language: SupportedLanguage | null;
+          language_confidence: number | null;
+          language_source: LanguageSource | null;
           created_at: string;
           updated_at: string;
         };
@@ -247,6 +258,9 @@ export interface Database {
           is_subscribed?: boolean;
           last_interaction_at?: string | null;
           metadata?: Json | null;
+          language?: SupportedLanguage | null;
+          language_confidence?: number | null;
+          language_source?: LanguageSource | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -257,6 +271,9 @@ export interface Database {
           is_subscribed?: boolean;
           last_interaction_at?: string | null;
           metadata?: Json | null;
+          language?: SupportedLanguage | null;
+          language_confidence?: number | null;
+          language_source?: LanguageSource | null;
           updated_at?: string;
         };
         Relationships: [
@@ -641,6 +658,7 @@ export interface Database {
           last_message_preview: string | null;
           unread_count: number;
           is_automation_paused: boolean;
+          language: SupportedLanguage | null;
           created_at: string;
           updated_at: string;
         };
@@ -657,6 +675,7 @@ export interface Database {
           last_message_preview?: string | null;
           unread_count?: number;
           is_automation_paused?: boolean;
+          language?: SupportedLanguage | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -668,6 +687,7 @@ export interface Database {
           last_message_preview?: string | null;
           unread_count?: number;
           is_automation_paused?: boolean;
+          language?: SupportedLanguage | null;
           updated_at?: string;
         };
         Relationships: [

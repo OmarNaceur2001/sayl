@@ -1,12 +1,22 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Plus, X, GripVertical, Image, Type, MousePointer, MessageCircle, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { SupportedLanguage } from "@/lib/types/database";
+
+const EDITOR_LANGUAGES: readonly SupportedLanguage[] = ["fr", "en", "ar", "tn"];
+const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
+  fr: "FR",
+  en: "EN",
+  ar: "AR",
+  tn: "TN",
+};
 
 interface QuickReply {
   title: string;
   payload: string;
+  translations?: Partial<Record<SupportedLanguage, string>>;
 }
 
 interface Button {
@@ -14,6 +24,7 @@ interface Button {
   type: "postback" | "url";
   payload?: string;
   url?: string;
+  translations?: Partial<Record<SupportedLanguage, string>>;
 }
 
 interface CarouselElement {
@@ -21,6 +32,8 @@ interface CarouselElement {
   title: string;
   subtitle?: string;
   buttons?: Button[];
+  translations?: Partial<Record<SupportedLanguage, string>>;
+  subtitleTranslations?: Partial<Record<SupportedLanguage, string>>;
 }
 
 interface Carousel {
@@ -29,6 +42,7 @@ interface Carousel {
 
 interface Message {
   text?: string;
+  translations?: Partial<Record<SupportedLanguage, string>>;
   imageUrl?: string;
   // Media attachment. mediaType + mediaUrl supersede the legacy image-only imageUrl
   // and let a message send an image, video, or audio file.
@@ -167,16 +181,28 @@ function MessageEditor({
 }) {
   const isCarouselMode = !!message.carousel;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [activeLanguage, setActiveLanguage] = useState<SupportedLanguage>("fr");
+  const [copyFromLanguage, setCopyFromLanguage] = useState<SupportedLanguage>("fr");
+  const languageText =
+    message.translations?.[activeLanguage] ??
+    (activeLanguage === "fr" ? message.text : undefined) ??
+    "";
 
   const insertVariable = useCallback(
     (variable: string) => {
       const token = `{{${variable}}}`;
       const textarea = textareaRef.current;
-      const text = message.text || "";
+      const text = languageText;
       const caret = textarea?.selectionStart ?? text.length;
+      const updatedText = text.slice(0, caret) + token + text.slice(caret);
+      const translations = {
+        ...message.translations,
+        [activeLanguage]: updatedText,
+      };
       onChange({
         ...message,
-        text: text.slice(0, caret) + token + text.slice(caret),
+        text: activeLanguage === "fr" ? updatedText : message.text,
+        translations,
       });
       // Restore focus and place the caret after the inserted token
       requestAnimationFrame(() => {
@@ -185,8 +211,31 @@ function MessageEditor({
         textarea.setSelectionRange(caret + token.length, caret + token.length);
       });
     },
-    [message, onChange]
+    [activeLanguage, languageText, message, onChange]
   );
+
+  const updateLanguageText = useCallback(
+    (text: string) => {
+      onChange({
+        ...message,
+        text: activeLanguage === "fr" ? text : message.text,
+        translations: { ...message.translations, [activeLanguage]: text },
+      });
+    },
+    [activeLanguage, message, onChange]
+  );
+
+  const copyTranslation = useCallback(() => {
+    const sourceText =
+      message.translations?.[copyFromLanguage] ??
+      (copyFromLanguage === "fr" ? message.text : undefined) ??
+      "";
+    onChange({
+      ...message,
+      text: activeLanguage === "fr" ? sourceText : message.text,
+      translations: { ...message.translations, [activeLanguage]: sourceText },
+    });
+  }, [activeLanguage, copyFromLanguage, message, onChange]);
 
   const toggleMode = useCallback(() => {
     if (isCarouselMode) {
@@ -314,10 +363,65 @@ function MessageEditor({
                 <Type className="h-3 w-3 text-muted-foreground/60" />
                 <label className="text-xs font-medium text-muted-foreground">Text</label>
               </div>
+              <div className="mb-2 flex flex-wrap items-center gap-1">
+                {EDITOR_LANGUAGES.map((language) => {
+                  const isFilled = Boolean(
+                    (message.translations?.[language] ??
+                      (language === "fr" ? message.text : undefined))?.trim()
+                  );
+                  return (
+                    <button
+                      key={language}
+                      type="button"
+                      onClick={() => {
+                        setActiveLanguage(language);
+                        if (copyFromLanguage === language) {
+                          setCopyFromLanguage(
+                            EDITOR_LANGUAGES.find((candidate) => candidate !== language) ?? "fr"
+                          );
+                        }
+                      }}
+                      aria-pressed={activeLanguage === language}
+                      className={cn(
+                        "rounded-md border px-2 py-1 text-[11px] font-semibold",
+                        activeLanguage === language
+                          ? "border-blue-500 bg-blue-50 text-blue-600"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {LANGUAGE_LABELS[language]} {isFilled ? "●" : "○"}
+                    </button>
+                  );
+                })}
+                <select
+                  aria-label="Copy translation from"
+                  value={copyFromLanguage}
+                  onChange={(event) =>
+                    setCopyFromLanguage(event.target.value as SupportedLanguage)
+                  }
+                  className="ml-auto min-w-0 rounded-md border border-border bg-card px-1.5 py-1 text-[11px] text-muted-foreground"
+                >
+                  {EDITOR_LANGUAGES.filter((language) => language !== activeLanguage).map(
+                    (language) => (
+                      <option key={language} value={language}>
+                        Copy from {LANGUAGE_LABELS[language]}
+                      </option>
+                    )
+                  )}
+                </select>
+                <button
+                  type="button"
+                  onClick={copyTranslation}
+                  className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted"
+                >
+                  Copy
+                </button>
+              </div>
               <textarea
                 ref={textareaRef}
-                value={message.text || ""}
-                onChange={(e) => onChange({ ...message, text: e.target.value })}
+                value={languageText}
+                dir={activeLanguage === "ar" || activeLanguage === "tn" ? "rtl" : "ltr"}
+                onChange={(e) => updateLanguageText(e.target.value)}
                 placeholder="Type your message... Insert variables below"
                 rows={3}
                 className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -398,8 +502,15 @@ function MessageEditor({
                 <div key={i} className="mb-2 flex items-center gap-2">
                   <input
                     type="text"
-                    value={qr.title}
-                    onChange={(e) => updateQuickReply(i, { ...qr, title: e.target.value })}
+                    dir={activeLanguage === "ar" || activeLanguage === "tn" ? "rtl" : "ltr"}
+                    value={qr.translations?.[activeLanguage] ?? (activeLanguage === "fr" ? qr.title : "")}
+                    onChange={(e) =>
+                      updateQuickReply(i, {
+                        ...qr,
+                        title: activeLanguage === "fr" ? e.target.value : qr.title,
+                        translations: { ...qr.translations, [activeLanguage]: e.target.value },
+                      })
+                    }
                     placeholder="Label"
                     className="flex-1 rounded border border-border bg-card px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
@@ -447,8 +558,18 @@ function MessageEditor({
                   <div className="mb-2 flex items-center gap-2">
                     <input
                       type="text"
-                      value={btn.title}
-                      onChange={(e) => updateButton(i, { ...btn, title: e.target.value })}
+                      dir={activeLanguage === "ar" || activeLanguage === "tn" ? "rtl" : "ltr"}
+                      value={btn.translations?.[activeLanguage] ?? (activeLanguage === "fr" ? btn.title : "")}
+                      onChange={(e) =>
+                        updateButton(i, {
+                          ...btn,
+                          title: activeLanguage === "fr" ? e.target.value : btn.title,
+                          translations: {
+                            ...btn.translations,
+                            [activeLanguage]: e.target.value,
+                          },
+                        })
+                      }
                       placeholder="Button label"
                       className="flex-1 rounded border border-border bg-card px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />

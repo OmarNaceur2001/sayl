@@ -10,7 +10,10 @@ import {
 import { upsertContactForSender } from "@/lib/inbox-sync";
 import { processComment } from "@/lib/comment-processor";
 import type { Database } from "@/lib/types/database";
+import type { SupportedLanguage } from "@/lib/types/database";
 import { messagePreview } from "@/lib/message-preview";
+import { detectLanguage } from "@/lib/language/detect";
+import { resolveContactLanguage } from "@/lib/language/resolve";
 
 // ── Zernio API webhook payload ───────────────────────────────────────────────
 
@@ -246,6 +249,71 @@ async function processMessageEvent(
   // ── Upsert conversation ──────────────────────────────────────────────────
 
   const preview = messagePreview(msg.text);
+  const detection = msg.text ? detectLanguage(msg.text) : null;
+  const [
+    { data: contactLanguage, error: contactLanguageError },
+    { data: workspaceLanguage, error: workspaceLanguageError },
+    { data: previousConversation, error: previousConversationError },
+  ] = await Promise.all([
+    supabase
+      .from("contacts")
+      .select("language, language_confidence, language_source")
+      .eq("id", contactId)
+      .single(),
+    supabase
+      .from("workspaces")
+      .select("default_language")
+      .eq("id", channel.workspace_id)
+      .single(),
+    supabase
+      .from("conversations")
+      .select("language")
+      .eq("channel_id", channel.id)
+      .eq("contact_id", contactId)
+      .maybeSingle(),
+  ]);
+
+  if (contactLanguageError) {
+    console.error("Failed to load contact language:", contactLanguageError);
+  }
+  if (workspaceLanguageError) {
+    console.error("Failed to load workspace default language:", workspaceLanguageError);
+  }
+  if (previousConversationError) {
+    console.error("Failed to load conversation language:", previousConversationError);
+  }
+
+  const resolvedLanguage = resolveContactLanguage(
+    {
+      language: contactLanguage?.language as SupportedLanguage | null ?? null,
+      language_confidence: contactLanguage?.language_confidence ?? null,
+      language_source: contactLanguage?.language_source as
+        | "detected"
+        | "manual"
+        | "default"
+        | null ?? null,
+    },
+    {
+      default_language:
+        workspaceLanguage?.default_language as SupportedLanguage | undefined ?? "fr",
+    },
+    detection,
+    previousConversation?.language as SupportedLanguage | null ?? null
+  );
+
+  if (resolvedLanguage.shouldUpdateContact) {
+    const { error: languageUpdateError } = await supabase
+      .from("contacts")
+      .update({
+        language: resolvedLanguage.contactLanguage,
+        language_confidence: resolvedLanguage.languageConfidence,
+        language_source: resolvedLanguage.languageSource,
+      })
+      .eq("id", contactId);
+    if (languageUpdateError) {
+      console.error("Failed to update contact language:", languageUpdateError);
+    }
+  }
 
   const { data: conversation } = await supabase
     .from("conversations")
@@ -260,6 +328,7 @@ async function processMessageEvent(
         last_message_at: new Date().toISOString(),
         last_message_preview: preview,
         unread_count: 1,
+        language: resolvedLanguage.conversationLanguage,
       },
       { onConflict: "channel_id,contact_id" }
     )

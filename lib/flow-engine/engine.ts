@@ -21,6 +21,8 @@ import { executeAiResponse } from "./nodes/ai-response";
 import { adaptMessage } from "./platform-adapter";
 import { createZernioClient } from "@/lib/zernio-client";
 import { getWorkspaceSecrets } from "@/lib/workspace-secrets";
+import { localizeMessageContent, pickLocalizedText } from "@/lib/language/pick-text";
+import type { SupportedLanguage } from "@/lib/types/database";
 
 export async function executeFlow(
   supabase: SupabaseClient<Database>,
@@ -37,6 +39,7 @@ export async function executeFlow(
   if (context.incomingMessage.text) {
     context.variables.message ??= context.incomingMessage.text;
   }
+  await seedContactLanguage(supabase, context);
 
   // Check for active session waiting for input
   const { data: activeSession } = await supabase
@@ -98,7 +101,7 @@ export async function executeFlow(
       flow_id: context.flowId,
       channel_id: context.channelId,
       status: "active",
-      variables: context.variables || {},
+      variables: (context.variables || {}) as Json,
     })
     .select("id")
     .single();
@@ -191,7 +194,8 @@ export async function resumeSession(
     }
   }
 
-  context.variables = (session.variables as Record<string, string>) || {};
+  context.variables = (session.variables as Record<string, unknown>) || {};
+  await seedContactLanguage(supabase, context);
 
   // The resume is driven by a fresh reply; make {{message}} reflect it.
   if (context.incomingMessage.text) {
@@ -385,8 +389,12 @@ async function sendFirstMessageAsPrivateReply(
   const first = data.messages[0];
   if (!first) return;
 
+  const languageContext = getFlowLanguageContext(context);
+  const localizedFirst = localizeMessageContent(first, languageContext.contactLanguage, {
+    default_language: languageContext.defaultLanguage,
+  });
   const text = interpolateVariables(
-    adaptMessage(first, context.platform ?? "instagram").text,
+    adaptMessage(localizedFirst, context.platform ?? "instagram").text,
     context.variables || {}
   );
 
@@ -485,7 +493,13 @@ async function executeSendMessage(
   }
 
   for (const msg of data.messages) {
-    const adapted = adaptMessage(msg, context.platform!);
+    const languageContext = getFlowLanguageContext(context);
+    const localizedMessage = localizeMessageContent(
+      msg,
+      languageContext.contactLanguage,
+      { default_language: languageContext.defaultLanguage }
+    );
+    const adapted = adaptMessage(localizedMessage, context.platform!);
     const text = interpolateVariables(adapted.text, context.variables || {});
 
     try {
@@ -604,7 +618,13 @@ async function executeCondition(
       fieldValue = String(hasTag);
     } else if (condition.field.startsWith("variable:")) {
       const varName = condition.field.replace("variable:", "");
-      fieldValue = context.variables?.[varName];
+      const value = context.variables?.[varName];
+      fieldValue =
+        value === null || value === undefined
+          ? undefined
+          : typeof value === "object"
+            ? JSON.stringify(value)
+            : String(value);
     } else {
       // Check custom fields
       const customFields = contact.contact_custom_fields as Array<{
@@ -680,7 +700,7 @@ async function executeDelay(
       lateConversationId: context.lateConversationId || null,
       lateAccountId: context.lateAccountId || null,
       variables: context.variables || {},
-    },
+    } as Json,
     run_at: runAt,
   });
 
@@ -890,7 +910,13 @@ async function executeCommentReply(
     return;
   }
 
-  const text = interpolateVariables(data.text, context.variables || {});
+  const languageContext = getFlowLanguageContext(context);
+  const text = interpolateVariables(
+    pickLocalizedText(data, languageContext.contactLanguage, {
+      default_language: languageContext.defaultLanguage,
+    }),
+    context.variables || {}
+  );
 
   try {
     await zernio.comments.replyToInboxPost({
@@ -939,7 +965,13 @@ async function executePrivateReply(
     return;
   }
 
-  const text = interpolateVariables(data.text, context.variables || {});
+  const languageContext = getFlowLanguageContext(context);
+  const text = interpolateVariables(
+    pickLocalizedText(data, languageContext.contactLanguage, {
+      default_language: languageContext.defaultLanguage,
+    }),
+    context.variables || {}
+  );
 
   try {
     await zernio.comments.sendPrivateReplyToComment({
@@ -1051,6 +1083,80 @@ async function executeEnrollSequence(
   if (error && error.code !== "23505") {
     console.error("Failed to enroll contact in sequence:", error);
   }
+}
+
+async function seedContactLanguage(
+  supabase: SupabaseClient<Database>,
+  context: FlowExecutionContext
+) {
+  const [
+    { data: contact, error: contactError },
+    { data: workspace, error: workspaceError },
+  ] = await Promise.all([
+    supabase.from("contacts").select("language").eq("id", context.contactId).single(),
+    supabase.from("workspaces").select("default_language").eq("id", context.workspaceId).single(),
+  ]);
+
+  if (contactError) {
+    console.error("Failed to load contact language for flow variables:", contactError);
+  }
+  if (workspaceError) {
+    console.error("Failed to load workspace language for flow variables:", workspaceError);
+  }
+
+  if (contactError && workspaceError) {
+    return;
+  }
+
+  const existingContactVariables =
+    typeof context.variables?.contact === "object" &&
+    context.variables.contact !== null
+      ? context.variables.contact as Record<string, unknown>
+      : {};
+  context.variables ??= {};
+  context.variables.contact = {
+    ...existingContactVariables,
+    language: contact?.language ?? null,
+  };
+  const existingWorkspaceVariables =
+    typeof context.variables.workspace === "object" &&
+    context.variables.workspace !== null
+      ? context.variables.workspace as Record<string, unknown>
+      : {};
+  context.variables.workspace = {
+    ...existingWorkspaceVariables,
+    default_language: workspace?.default_language ?? "fr",
+  };
+}
+
+function getFlowLanguageContext(context: FlowExecutionContext): {
+  contactLanguage: SupportedLanguage | null;
+  defaultLanguage: SupportedLanguage;
+} {
+  const contactVariables = context.variables?.contact;
+  const workspaceVariables = context.variables?.workspace;
+  const contactLanguage =
+    typeof contactVariables === "object" && contactVariables !== null
+      ? (contactVariables as Record<string, unknown>).language
+      : null;
+  const defaultLanguage =
+    typeof workspaceVariables === "object" && workspaceVariables !== null
+      ? (workspaceVariables as Record<string, unknown>).default_language
+      : null;
+  const supportedLanguages: readonly SupportedLanguage[] = ["fr", "en", "ar", "tn"];
+
+  return {
+    contactLanguage:
+      typeof contactLanguage === "string" &&
+      supportedLanguages.includes(contactLanguage as SupportedLanguage)
+        ? (contactLanguage as SupportedLanguage)
+        : null,
+    defaultLanguage:
+      typeof defaultLanguage === "string" &&
+      supportedLanguages.includes(defaultLanguage as SupportedLanguage)
+        ? (defaultLanguage as SupportedLanguage)
+        : "fr",
+  };
 }
 
 function resolveVariablePath(
