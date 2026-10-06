@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceRole } from "@/lib/auth/require-role";
 import { BUILDER_TRIGGER_TYPES, buildDesiredTriggers } from "@/lib/flow-triggers";
 
 export async function POST(
@@ -24,6 +25,9 @@ export async function POST(
 
   if (!membership)
     return NextResponse.json({ error: "No workspace" }, { status: 404 });
+
+  const roleResult = await requireWorkspaceRole(user.id, membership.workspace_id, ["owner", "admin"]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // Get current flow
   const { data: flow, error } = await supabase

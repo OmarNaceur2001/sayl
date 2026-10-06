@@ -18,7 +18,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PlatformIcon } from "@/components/platform-icon";
 import type { Database } from "@/lib/types/database";
 import {
-  PLATFORMS,
+  ENABLED_PLATFORMS,
   PLATFORM_LABELS,
   platformLabel,
   type Platform,
@@ -138,7 +138,7 @@ export function ChannelsView({
         setSyncMessage(`Could not save some channels: ${failed.join("; ")}`);
       } else if (nothingChanged && syncedChannels.length === 0 && skipped.length > 0) {
         setSyncMessage(
-          `Nothing to connect: ZernFlow does not support ${skipped.join(", ")}`
+          `Nothing to connect: Sayl does not support ${skipped.join(", ")}`
         );
       } else if (nothingChanged) {
         setSyncMessage("All channels up to date");
@@ -240,7 +240,7 @@ export function ChannelsView({
               </button>
               {showPlatformPicker && (
                 <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-lg">
-                  {PLATFORMS.map((p) => (
+                  {ENABLED_PLATFORMS.map((p) => (
                     <button
                       key={p}
                       onClick={() => handleConnect(p)}
@@ -454,7 +454,7 @@ export function ChannelsView({
           channelToDelete?.display_name ??
           channelToDelete?.username ??
           (channelToDelete ? platformLabel(channelToDelete.platform) : "this channel")
-        } from Zernio and permanently deletes its conversations, contact links, and stats in Zernflow. This cannot be undone.`}
+        } from Zernio and permanently deletes its conversations, contact links, and stats in Sayl. This cannot be undone.`}
         confirmLabel="Delete"
         destructive
         onConfirm={handleDelete}

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createZernioClient } from "@/lib/zernio-client";
-import { PLATFORMS, isSupportedPlatform } from "@/lib/platforms";
+import { getWorkspaceSecrets } from "@/lib/workspace-secrets";
+import { requireWorkspaceRole } from "@/lib/auth/require-role";
+import {
+  ENABLED_PLATFORMS,
+  isSupportedPlatform,
+} from "@/lib/platforms";
 
 async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -33,7 +38,13 @@ export async function POST(request: NextRequest) {
   if (!workspace)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!workspace.late_api_key_encrypted) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const roleResult = await requireWorkspaceRole(user.id, workspace.id, ["owner", "admin"]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const secrets = await getWorkspaceSecrets(workspace.id);
+  if (!secrets.late_api_key_encrypted) {
     return NextResponse.json(
       { error: "Zernio API key not configured. Go to Settings first." },
       { status: 400 }
@@ -44,12 +55,21 @@ export async function POST(request: NextRequest) {
 
   if (!isSupportedPlatform(platform)) {
     return NextResponse.json(
-      { error: `Unsupported platform. Must be one of: ${PLATFORMS.join(", ")}` },
+      { error: "Unsupported platform." },
       { status: 400 }
     );
   }
 
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  if (!ENABLED_PLATFORMS.includes(platform)) {
+    return NextResponse.json(
+      {
+        error: `Platform is disabled. Enabled platforms: ${ENABLED_PLATFORMS.join(", ")}`,
+      },
+      { status: 400 }
+    );
+  }
+
+  const zernio = createZernioClient(secrets.late_api_key_encrypted);
 
   try {
     // Get profile ID (required by Zernio's connect endpoint)

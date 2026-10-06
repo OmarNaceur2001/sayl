@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { FlowLoadError, resumeSession } from "@/lib/flow-engine/engine";
 import type { Json } from "@/lib/types/database";
+import { hasValidCronAuthorization } from "@/lib/cron-auth";
 
 // Signals the handler to skip retry/backoff and route straight to the
 // failed + settle branch (which performs/re-attempts the session cancel).
@@ -31,16 +32,11 @@ function wasSessionWrittenRecently(updatedAt: string): boolean {
 /**
  * Cron job handler that processes scheduled jobs.
  * Call via Vercel Cron or external cron every 10-30 seconds.
- * GET /api/cron/jobs?key=CRON_SECRET
+ * Requests must provide Authorization: Bearer <CRON_SECRET>.
  */
 export async function GET(request: NextRequest) {
-  // Simple auth via query param or header
   const cronSecret = process.env.CRON_SECRET;
-  const providedSecret =
-    request.nextUrl.searchParams.get("key") ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!hasValidCronAuthorization(request.headers.get("authorization"), cronSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -549,9 +545,9 @@ async function processJob(
       if (!broadcast) return;
 
       const { data: workspace } = await supabase
-        .from("workspaces")
+        .from("workspace_secrets")
         .select("late_api_key_encrypted")
-        .eq("id", broadcast.workspace_id)
+        .eq("workspace_id", broadcast.workspace_id)
         .single();
 
       if (!workspace?.late_api_key_encrypted) return;

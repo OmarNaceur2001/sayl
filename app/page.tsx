@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { PlatformIcon } from "@/components/platform-icon";
 import { SaylLogo } from "@/components/sayl-logo";
+import { brand } from "@/lib/brand";
 
 const platforms = [
   { name: "Instagram", platform: "instagram" },
@@ -280,11 +281,7 @@ export default function Home() {
         <section className="hero-section mx-auto max-w-6xl px-6 pb-16 pt-16 sm:pb-20 sm:pt-24">
           <div className="hero-copy">
             <p className="eyebrow"><span className="signal-dot" /> SOCIAL AUTOMATION, BUILT FOR TEAMS</p>
-            <h1>
-              Social conversations,
-              <br />
-              <em>on your terms</em>
-            </h1>
+            <h1><em>{brand.tagline}</em></h1>
             <p className="hero-description">
               Automate DMs, comments, and flows across Instagram, Facebook, WhatsApp,
               Telegram, X, Bluesky, and Reddit. Bring your social conversations and team

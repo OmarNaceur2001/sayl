@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceRole } from "@/lib/auth/require-role";
 
-async function getWorkspaceId(supabase: Awaited<ReturnType<typeof createClient>>) {
+async function getWorkspaceContext(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -14,7 +15,8 @@ async function getWorkspaceId(supabase: Awaited<ReturnType<typeof createClient>>
     .limit(1)
     .single();
 
-  return membership?.workspace_id || null;
+  if (!membership?.workspace_id) return null;
+  return { workspaceId: membership.workspace_id, userId: user.id };
 }
 
 export async function GET(
@@ -23,15 +25,15 @@ export async function GET(
 ) {
   const { flowId } = await params;
   const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId)
+  const context = await getWorkspaceContext(supabase);
+  if (!context)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: flow, error } = await supabase
     .from("flows")
     .select("*, triggers(*)")
     .eq("id", flowId)
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", context.workspaceId)
     .single();
 
   if (error || !flow)
@@ -46,12 +48,14 @@ export async function PUT(
 ) {
   const { flowId } = await params;
   const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId)
+  const context = await getWorkspaceContext(supabase);
+  if (!context)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json();
+  const roleResult = await requireWorkspaceRole(context.userId, context.workspaceId, ["owner", "admin"]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const body = await request.json();
   const update: Record<string, unknown> = {};
   if (body.name !== undefined) update.name = body.name;
   if (body.description !== undefined) update.description = body.description;
@@ -63,7 +67,7 @@ export async function PUT(
     .from("flows")
     .update(update)
     .eq("id", flowId)
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", context.workspaceId)
     .select("id, name, status, updated_at")
     .single();
 
@@ -79,15 +83,18 @@ export async function DELETE(
 ) {
   const { flowId } = await params;
   const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId)
+  const context = await getWorkspaceContext(supabase);
+  if (!context)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const roleResult = await requireWorkspaceRole(context.userId, context.workspaceId, ["owner", "admin"]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { error } = await supabase
     .from("flows")
     .delete()
     .eq("id", flowId)
-    .eq("workspace_id", workspaceId);
+    .eq("workspace_id", context.workspaceId);
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -19,7 +19,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { saveWorkspaceSettings } from "@/lib/actions/settings";
 
 interface WorkspaceSettings {
   id: string;
@@ -27,6 +27,7 @@ interface WorkspaceSettings {
   hasApiKey: boolean;
   hasAiKey: boolean;
   globalKeywords: string[];
+  canEdit: boolean;
 }
 
 interface TestResult {
@@ -117,32 +118,14 @@ export function SettingsView({
     setSaved(false);
 
     try {
-      const supabase = createClient();
-
-      const update: Record<string, unknown> = {
-        name: name.trim(),
-        global_keywords: keywords,
-      };
-
-      // Only update keys if user entered new ones
-      if (apiKey.trim()) {
-        update.late_api_key_encrypted = apiKey.trim();
-      }
-      if (aiKey.trim()) {
-        update.ai_api_key = aiKey.trim();
-      }
-
-      const { error: updateError } = await supabase
-        .from("workspaces")
-        .update(update)
-        .eq("id", workspace.id)
-        .select("id")
-        .single();
-
-      if (updateError) {
-        console.error("Settings save error:", updateError);
-        throw new Error(updateError.message);
-      }
+      const result = await saveWorkspaceSettings({
+        workspaceId: workspace.id,
+        name,
+        globalKeywords: keywords,
+        lateApiKey: apiKey,
+        aiApiKey: aiKey,
+      });
+      if (result.error) throw new Error(result.error);
 
       setSaved(true);
       setApiKey("");
@@ -257,7 +240,7 @@ export function SettingsView({
             <div className="mt-3 flex items-center gap-3">
               <button
                 onClick={handleTestConnection}
-                disabled={!apiKey.trim() || testing}
+                disabled={!workspace.canEdit || !apiKey.trim() || testing}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {testing ? (
@@ -436,7 +419,7 @@ export function SettingsView({
           <div className="flex items-center gap-3">
             <button
               onClick={handleSave}
-              disabled={saving || !name.trim()}
+              disabled={!workspace.canEdit || saving || !name.trim()}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {saving ? (

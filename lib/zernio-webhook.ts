@@ -1,24 +1,24 @@
 /**
  * Zernio webhook auto-registration.
  *
- * Zernflow must register its own `/api/webhooks/late` endpoint in Zernio so that
+ * Sayl must register its own `/api/webhooks/late` endpoint in Zernio so that
  * inbound events (DMs, comments) are delivered to the Inbox. Zernio exposes a
  * single webhook per profile/API key, so this is idempotent and operates at the
- * workspace level (the secret lives on `workspaces.webhook_secret`).
+ * workspace level (the secret lives in the server-only `workspace_secrets` table).
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Zernio } from "./zernio-client";
 
-/** Name used to identify Zernflow's webhook among a profile's webhooks. */
+/** Stable provider-side name used to identify the existing webhook. */
 export const WEBHOOK_NAME = "Zernflow";
 
-/** Events Zernflow needs delivered to its webhook. */
+/** Events Sayl needs delivered to its webhook. */
 export type WebhookEvent = "message.received" | "comment.received";
 
 export interface EnsureWebhookOptions {
-  /** Public base URL of this Zernflow deployment (e.g. NEXT_PUBLIC_APP_URL). */
+  /** Public base URL of this Sayl deployment (e.g. NEXT_PUBLIC_APP_URL). */
   appUrl: string;
   /** Workspace-level HMAC secret used to verify webhook signatures. */
   secret: string;
@@ -62,7 +62,7 @@ function samePath(a: string | undefined, b: string): boolean {
 }
 
 /**
- * Ensures Zernflow's webhook is registered in Zernio and up to date.
+ * Ensures Sayl's webhook is registered in Zernio and up to date.
  *
  * - No webhook found → create it.
  * - Found but URL differs or an event is missing → update it.
@@ -121,18 +121,38 @@ export async function getOrCreateWorkspaceWebhookSecret(
   supabase: SupabaseClient,
   workspaceId: string,
 ): Promise<string> {
-  const { data } = await supabase
-    .from("workspaces")
+  const { data, error: lookupError } = await supabase
+    .from("workspace_secrets")
     .select("webhook_secret")
-    .eq("id", workspaceId)
-    .single();
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (lookupError) {
+    throw new Error(`Failed to load workspace webhook secret: ${lookupError.message}`);
+  }
 
   const existing = (data as { webhook_secret?: string | null } | null)?.webhook_secret;
   if (existing) return existing;
 
   const secret = generateWebhookSecret();
-  await supabase.from("workspaces").update({ webhook_secret: secret }).eq("id", workspaceId);
-  return secret;
+  const { error } = await supabase.from("workspace_secrets").upsert(
+    { workspace_id: workspaceId, webhook_secret: secret },
+    { onConflict: "workspace_id", ignoreDuplicates: true }
+  );
+  if (error) {
+    throw new Error(`Failed to persist workspace webhook secret: ${error.message}`);
+  }
+
+  const { data: saved, error: readError } = await supabase
+    .from("workspace_secrets")
+    .select("webhook_secret")
+    .eq("workspace_id", workspaceId)
+    .single();
+  if (readError) {
+    throw new Error(`Failed to reload workspace webhook secret: ${readError.message}`);
+  }
+  const savedSecret = (saved as { webhook_secret?: string | null } | null)?.webhook_secret;
+  if (!savedSecret) throw new Error("Workspace webhook secret was not persisted.");
+  return savedSecret;
 }
 
 /**
@@ -152,27 +172,50 @@ export function verifyWebhookSignature(
   return timingSafeEqual(sigBuf, expBuf);
 }
 
+export function getWebhookSignatureFailure(
+  secret: string | null,
+  body: string,
+  signature: string | null,
+): "missing_secret" | "invalid_signature" | null {
+  if (!secret) return "missing_secret";
+  return verifyWebhookSignature(secret, body, signature)
+    ? null
+    : "invalid_signature";
+}
+
 /** Minimal channel shape needed to resolve the webhook secret. */
 export interface ChannelSecretRef {
+  id: string;
   workspace_id: string;
-  webhook_secret?: string | null;
 }
 
 /**
  * Resolves the secret used to verify a webhook signature, preferring the
- * workspace-level secret and falling back to the legacy per-channel secret
- * during the transition. Returns null when neither is configured.
+ * workspace-level secret and falling back to a migrated per-channel secret.
  */
 export async function resolveWebhookSecret(
   supabase: SupabaseClient,
   channel: ChannelSecretRef,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("workspaces")
+  const { data, error: workspaceError } = await supabase
+    .from("workspace_secrets")
     .select("webhook_secret")
-    .eq("id", channel.workspace_id)
-    .single();
+    .eq("workspace_id", channel.workspace_id)
+    .maybeSingle();
+  if (workspaceError) {
+    throw new Error(`Failed to load workspace webhook secret: ${workspaceError.message}`);
+  }
 
   const workspaceSecret = (data as { webhook_secret?: string | null } | null)?.webhook_secret;
-  return workspaceSecret || channel.webhook_secret || null;
+  if (workspaceSecret) return workspaceSecret;
+
+  const { data: channelSecret, error: channelError } = await supabase
+    .from("channel_secrets")
+    .select("webhook_secret")
+    .eq("channel_id", channel.id)
+    .maybeSingle();
+  if (channelError) {
+    throw new Error(`Failed to load channel webhook secret: ${channelError.message}`);
+  }
+  return (channelSecret as { webhook_secret?: string | null } | null)?.webhook_secret ?? null;
 }

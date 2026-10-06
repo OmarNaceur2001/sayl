@@ -3,7 +3,10 @@ import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { executeFlow } from "@/lib/flow-engine/engine";
 import { matchTrigger } from "@/lib/flow-engine/trigger-matcher";
-import { resolveWebhookSecret, verifyWebhookSignature } from "@/lib/zernio-webhook";
+import {
+  getWebhookSignatureFailure,
+  resolveWebhookSecret,
+} from "@/lib/zernio-webhook";
 import { upsertContactForSender } from "@/lib/inbox-sync";
 import { processComment } from "@/lib/comment-processor";
 import type { Database } from "@/lib/types/database";
@@ -173,11 +176,24 @@ async function handleWebhook(request: NextRequest) {
     }
   }
 
-  // Verify HMAC-SHA256 signature against the workspace-level secret
-  // (falls back to the legacy per-channel secret during transition).
+  // Verify HMAC-SHA256 signature against the resolved workspace secret.
   const secret = await resolveWebhookSecret(supabase, channel);
-  if (secret && !verifyWebhookSignature(secret, body, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  const signatureFailure = getWebhookSignatureFailure(secret, body, signature);
+  if (signatureFailure) {
+    if (signatureFailure === "missing_secret") {
+      console.warn(
+        "[late-webhook] no signature secret configured for workspace:",
+        channel.workspace_id
+      );
+    }
+    return NextResponse.json(
+      {
+        error: signatureFailure === "missing_secret"
+          ? "Webhook signature secret is not configured"
+          : "Invalid signature",
+      },
+      { status: 401 }
+    );
   }
 
   if (!(await claimWebhookEvent(supabase, eventId))) {
@@ -348,8 +364,22 @@ async function handleCommentWebhook(
   }
 
   const secret = await resolveWebhookSecret(supabase, channel);
-  if (secret && !verifyWebhookSignature(secret, rawBody, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  const signatureFailure = getWebhookSignatureFailure(secret, rawBody, signature);
+  if (signatureFailure) {
+    if (signatureFailure === "missing_secret") {
+      console.warn(
+        "[late-webhook] no signature secret configured for workspace:",
+        channel.workspace_id
+      );
+    }
+    return NextResponse.json(
+      {
+        error: signatureFailure === "missing_secret"
+          ? "Webhook signature secret is not configured"
+          : "Invalid signature",
+      },
+      { status: 401 }
+    );
   }
 
   if (!(await claimWebhookEvent(supabase, eventId))) {

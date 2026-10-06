@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import type { FlowExecutionContext, AiResponseNodeData } from "../types";
 import { createZernioClient } from "@/lib/zernio-client";
+import { getWorkspaceSecrets } from "@/lib/workspace-secrets";
 import { generateText, createGateway } from "ai";
 
 // Halt the run: continuing would let a downstream Send Message deliver the
@@ -25,13 +26,9 @@ export async function executeAiResponse(
   sessionId: string
 ) {
   // Get workspace for Zernio API key + AI Gateway key
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted, ai_api_key")
-    .eq("id", context.workspaceId)
-    .single();
+  const workspace = await getWorkspaceSecrets(context.workspaceId);
 
-  if (!workspace?.late_api_key_encrypted) {
+  if (!workspace.late_api_key_encrypted) {
     console.error("No Zernio API key for workspace:", context.workspaceId);
     return cancelRun(supabase, sessionId);
   }

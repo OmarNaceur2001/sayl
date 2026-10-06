@@ -4,8 +4,9 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Github, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { SaylLogo } from "@/components/sayl-logo";
+import { brand } from "@/lib/brand";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -64,7 +65,7 @@ export default function RegisterPage() {
           <h1>
             Create your <em>account</em>
           </h1>
-          <p>Get started with Sayl</p>
+          <p>{brand.tagline}</p>
         </header>
 
         <form onSubmit={handleSubmit} className="auth-form">

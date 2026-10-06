@@ -4,8 +4,9 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Github, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { SaylLogo } from "@/components/sayl-logo";
+import { brand } from "@/lib/brand";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -59,7 +60,7 @@ export default function LoginPage() {
           <h1>
             Welcome <em>back</em>
           </h1>
-          <p>Sign in to Sayl</p>
+          <p>{brand.tagline}</p>
         </header>
 
         <form onSubmit={handleSubmit} className="auth-form">

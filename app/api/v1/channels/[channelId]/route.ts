@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createZernioClient } from "@/lib/zernio-client";
+import { getWorkspaceSecrets } from "@/lib/workspace-secrets";
+import { requireWorkspaceRole } from "@/lib/auth/require-role";
 
 async function getWorkspace(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -36,6 +38,11 @@ export async function DELETE(
   if (!workspace)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const roleResult = await requireWorkspaceRole(user.id, workspace.id, ["owner", "admin"]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const { data: channel } = await supabase
     .from("channels")
     .select("id, late_account_id")
@@ -46,8 +53,9 @@ export async function DELETE(
   if (!channel)
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
 
-  if (workspace.late_api_key_encrypted) {
-    const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  const secrets = await getWorkspaceSecrets(workspace.id);
+  if (secrets.late_api_key_encrypted) {
+    const zernio = createZernioClient(secrets.late_api_key_encrypted);
     try {
       const res = await zernio.accounts.deleteAccount({
         path: { accountId: channel.late_account_id },

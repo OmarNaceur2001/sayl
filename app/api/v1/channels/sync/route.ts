@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { createZernioClient } from "@/lib/zernio-client";
+import { getWorkspaceSecrets } from "@/lib/workspace-secrets";
+import { requireWorkspaceRole } from "@/lib/auth/require-role";
 import {
   ensureWebhookRegistered,
   getOrCreateWorkspaceWebhookSecret,
@@ -38,14 +40,20 @@ export async function POST() {
   if (!workspace)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!workspace.late_api_key_encrypted) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const roleResult = await requireWorkspaceRole(user.id, workspace.id, ["owner", "admin"]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const secrets = await getWorkspaceSecrets(workspace.id);
+  if (!secrets.late_api_key_encrypted) {
     return NextResponse.json(
       { error: "Zernio API key not configured. Go to Settings first." },
       { status: 400 }
     );
   }
 
-  const zernio = createZernioClient(workspace.late_api_key_encrypted);
+  const zernio = createZernioClient(secrets.late_api_key_encrypted);
 
   try {
     const res = await zernio.accounts.listAccounts();
@@ -136,7 +144,8 @@ export async function POST() {
     // registration only happened in the Settings test-key flow (#12).
     // Best-effort: a failure must not block the channel sync.
     try {
-      const secret = await getOrCreateWorkspaceWebhookSecret(supabase, workspace.id);
+      const serviceClient = await createServiceClient();
+      const secret = await getOrCreateWorkspaceWebhookSecret(serviceClient, workspace.id);
       await ensureWebhookRegistered(zernio, {
         appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
         secret,

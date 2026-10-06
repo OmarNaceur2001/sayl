@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types/database";
 import { executeFlow } from "@/lib/flow-engine/engine";
 import { createZernioClient } from "@/lib/zernio-client";
+import { getWorkspaceSecrets } from "@/lib/workspace-secrets";
 
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 type Trigger = Database["public"]["Tables"]["triggers"]["Row"];
@@ -169,13 +170,9 @@ export async function processComment({
 
     let replySent = false;
     if (config.replyText) {
-      const { data: workspace } = await supabase
-        .from("workspaces")
-        .select("late_api_key_encrypted")
-        .eq("id", channel.workspace_id)
-        .single();
+      const workspace = await getWorkspaceSecrets(channel.workspace_id);
 
-      if (workspace?.late_api_key_encrypted) {
+      if (workspace.late_api_key_encrypted) {
         try {
           const zernio = createZernioClient(workspace.late_api_key_encrypted);
           await zernio.comments.replyToInboxPost({

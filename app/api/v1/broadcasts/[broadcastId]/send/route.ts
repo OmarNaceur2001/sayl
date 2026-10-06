@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { requireWorkspaceRole } from "@/lib/auth/require-role";
 import { scheduleBroadcastDelivery } from "@/lib/scheduler";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json, Platform } from "@/lib/types/database";
@@ -51,6 +52,9 @@ export async function POST(
   if (!membership) {
     return NextResponse.json({ error: "No workspace" }, { status: 404 });
   }
+
+  const roleResult = await requireWorkspaceRole(user.id, membership.workspace_id, ["owner", "admin"]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // Fetch the broadcast
   const { data: broadcast, error: broadcastErr } = await supabase

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createZernioClient } from "@/lib/zernio-client";
 import { messagePreview } from "@/lib/message-preview";
+import { getWorkspaceSecrets } from "@/lib/workspace-secrets";
+import { requireWorkspaceRole } from "@/lib/auth/require-role";
 
 /**
  * GET /api/v1/messages?conversationId=...
@@ -31,13 +33,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Conversation not found or missing Zernio ID" }, { status: 404 });
   }
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", conversation.workspace_id)
-    .single();
+  const workspace = await getWorkspaceSecrets(conversation.workspace_id);
 
-  if (!workspace?.late_api_key_encrypted) {
+  if (!workspace.late_api_key_encrypted) {
     return NextResponse.json({ error: "API key not configured" }, { status: 400 });
   }
 
@@ -121,6 +119,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
   }
 
+  const roleResult = await requireWorkspaceRole(user.id, conversation.workspace_id, [
+    "owner",
+    "admin",
+    "member",
+  ]);
+  if (!roleResult.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   if (!conversation.late_conversation_id) {
     return NextResponse.json(
       { error: "No Zernio conversation ID linked to this conversation" },
@@ -133,13 +138,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Channel not found or missing Zernio account ID" }, { status: 404 });
   }
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("late_api_key_encrypted")
-    .eq("id", conversation.workspace_id)
-    .single();
+  const workspace = await getWorkspaceSecrets(conversation.workspace_id);
 
-  if (!workspace?.late_api_key_encrypted) {
+  if (!workspace.late_api_key_encrypted) {
     return NextResponse.json({ error: "API key not configured" }, { status: 400 });
   }
 
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     const messageId = (res.data as any)?.data?.messageId ?? null;
 
-    // Update conversation's last message info (ZernFlow-specific metadata)
+    // Update conversation's last message info (Sayl-specific metadata)
     await supabase
       .from("conversations")
       .update({

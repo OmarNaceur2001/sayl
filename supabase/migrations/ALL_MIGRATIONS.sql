@@ -1,13 +1,3 @@
--- =============================================
--- ZERNFLOW - COMBINED MIGRATIONS
--- Generated from supabase/migrations/*.sql, in order.
--- Paste this entire file into Supabase SQL Editor
--- https://supabase.com/dashboard/project/_/sql/new
--- =============================================
-
--- ============================================================
--- MIGRATION 1: INITIAL SCHEMA
--- ============================================================
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
@@ -337,10 +327,6 @@ $$ language plpgsql security definer set search_path = public;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
-
--- ============================================================
--- MIGRATION 2: RLS POLICIES
--- ============================================================
 -- ============================================================
 -- ROW LEVEL SECURITY POLICIES
 -- ============================================================
@@ -679,10 +665,6 @@ create policy "Users can view analytics in their workspaces"
 create policy "Users can insert analytics in their workspaces"
   on analytics_events for insert
   with check (is_workspace_member(workspace_id));
-
--- ============================================================
--- MIGRATION 3: RPC FUNCTIONS
--- ============================================================
 -- ============================================================
 -- RPC FUNCTIONS
 -- ============================================================
@@ -720,10 +702,6 @@ begin
   where id = b_id;
 end;
 $$ language plpgsql security definer;
-
--- ============================================================
--- MIGRATION 4: COMMENT AUTOMATION
--- ============================================================
 -- ============================================================
 -- COMMENT AUTOMATION
 -- ============================================================
@@ -771,10 +749,6 @@ create policy "Users can view comment logs in their workspace"
       select workspace_id from workspace_members where user_id = auth.uid()
     )
   );
-
--- ============================================================
--- MIGRATION 5: SEQUENCES
--- ============================================================
 -- Sequences: drip campaigns
 CREATE TABLE IF NOT EXISTS sequences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -817,10 +791,6 @@ CREATE POLICY "enrollments_via_sequence" ON sequence_enrollments
       )
     )
   );
-
--- ============================================================
--- MIGRATION 6: WORKSPACE INVITES
--- ============================================================
 -- ============================================================
 -- WORKSPACE INVITES
 -- ============================================================
@@ -875,23 +845,11 @@ CREATE POLICY "workspace_invites_update" ON workspace_invites
     -- Allow the invited user to accept their own invite
     email = (SELECT email FROM auth.users WHERE id = auth.uid())
   );
-
--- ============================================================
--- MIGRATION 7: OPENAI API KEY
--- ============================================================
 -- Add OpenAI API key column to workspaces
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS openai_api_key TEXT;
-
--- ============================================================
--- MIGRATION 8: AI PROVIDER
--- ============================================================
 -- Rename openai_api_key to ai_api_key and add ai_provider column
 ALTER TABLE workspaces RENAME COLUMN openai_api_key TO ai_api_key;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS ai_provider TEXT NOT NULL DEFAULT 'openai';
-
--- ============================================================
--- MIGRATION 9: FIX BROADCAST RLS
--- ============================================================
 -- Fix broadcast_recipients: add INSERT/UPDATE/DELETE policies
 CREATE POLICY "Users can insert broadcast recipients" ON broadcast_recipients
   FOR INSERT WITH CHECK (
@@ -912,10 +870,6 @@ CREATE POLICY "Users can update broadcast recipients" ON broadcast_recipients
   );
 
 -- scheduled_jobs is system-level; keep access restricted to service-role code.
-
--- ============================================================
--- MIGRATION 10: FLOW VERSIONS
--- ============================================================
 -- Flow version history: stores a snapshot of nodes/edges on each publish
 create table flow_versions (
   id uuid primary key default uuid_generate_v4(),
@@ -950,18 +904,10 @@ create policy "flow_versions_insert" on flow_versions for insert
     where f.id = flow_versions.flow_id
       and wm.user_id = auth.uid()
   ));
-
--- ============================================================
--- MIGRATION 11: WORKSPACE WEBHOOK SECRET
--- ============================================================
 -- Add workspace-level webhook secret for Zernio HMAC signature verification.
 -- Zernio exposes a single webhook per profile/API key, so the secret lives at the
 -- workspace level (not per-channel). Used by /api/webhooks/late to verify signatures.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS webhook_secret TEXT;
-
--- ============================================================
--- MIGRATION 12: WEBHOOK EVENTS
--- ============================================================
 -- Idempotency ledger for inbound Zernio webhook deliveries. Zernio retries a
 -- delivery with the same event id whenever our 200 doesn't arrive within its 5s
 -- timeout; /api/webhooks/late claims the id here before processing so retries
@@ -975,10 +921,6 @@ CREATE TABLE IF NOT EXISTS webhook_events (
 CREATE INDEX IF NOT EXISTS webhook_events_received_at_idx ON webhook_events (received_at);
 
 ALTER TABLE webhook_events ENABLE ROW LEVEL SECURITY;
-
--- ============================================================
--- MIGRATION 13: SEQUENCE ENROLLMENTS CHANNEL CASCADE
--- ============================================================
 -- sequence_enrollments.channel_id was declared without an ON DELETE action
 -- (00005_sequences.sql), so deleting a channel with enrollments failed with a
 -- 23503 FK violation. Every other channel FK cascades (or sets null); align
@@ -987,10 +929,6 @@ ALTER TABLE sequence_enrollments
   DROP CONSTRAINT sequence_enrollments_channel_id_fkey,
   ADD CONSTRAINT sequence_enrollments_channel_id_fkey
     FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE;
-
--- ============================================================
--- MIGRATION 14: SCHEDULED JOBS CLAIMED AT
--- ============================================================
 -- The cron claims a job by flipping status to 'processing'. If that UPDATE
 -- commits but the response is lost, the job is stranded: the fetch only read
 -- 'pending' rows. claimed_at lets the cron reclaim 'processing' jobs whose
@@ -999,10 +937,6 @@ ALTER TABLE scheduled_jobs ADD COLUMN claimed_at timestamptz;
 
 CREATE INDEX idx_scheduled_jobs_processing ON scheduled_jobs(claimed_at)
   WHERE status = 'processing';
-
--- ============================================================
--- MIGRATION 15: BACKFILL CLAIMED AT
--- ============================================================
 -- 00014 added claimed_at but did not backfill rows already stuck in
 -- 'processing', and old-code invocations claim without stamping it. Stamp
 -- existing NULL claims so the cron's staleness clock (claimed_at older than
@@ -1012,10 +946,6 @@ CREATE INDEX idx_scheduled_jobs_processing ON scheduled_jobs(claimed_at)
 UPDATE scheduled_jobs
 SET claimed_at = now()
 WHERE status = 'processing' AND claimed_at IS NULL;
-
--- ============================================================
--- MIGRATION 16: WHATSAPP CHANNEL PLATFORM
--- ============================================================
 -- WhatsApp was advertised on the site, offered in the channel picker and
 -- already handled by the flow engine, but 00001's platform check constraint
 -- never listed it, so the channel row could not be stored (issue #16).
@@ -1023,3 +953,745 @@ ALTER TABLE channels DROP CONSTRAINT IF EXISTS channels_platform_check;
 
 ALTER TABLE channels ADD CONSTRAINT channels_platform_check
   CHECK (platform IN ('facebook', 'instagram', 'twitter', 'telegram', 'bluesky', 'reddit', 'whatsapp'));
+-- Invitees must not be able to update any field on an invite. Acceptance is
+-- performed atomically by the authenticated RPC below.
+DROP POLICY IF EXISTS workspace_invites_update ON public.workspace_invites;
+
+CREATE OR REPLACE FUNCTION public.accept_workspace_invite(p_invite_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+SET row_security = off
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_user_email text;
+  v_invite public.workspace_invites%ROWTYPE;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '28000';
+  END IF;
+
+  SELECT pg_catalog.lower(users.email)
+  INTO v_user_email
+  FROM auth.users AS users
+  WHERE users.id = v_user_id;
+
+  IF v_user_email IS NULL THEN
+    RAISE EXCEPTION 'Authenticated account has no email address'
+      USING ERRCODE = '28000';
+  END IF;
+
+  SELECT invites.*
+  INTO v_invite
+  FROM public.workspace_invites AS invites
+  WHERE invites.id = p_invite_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invite not found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_invite.status <> 'pending' THEN
+    RAISE EXCEPTION 'This invite is no longer valid' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_invite.expires_at IS NULL OR v_invite.expires_at <= pg_catalog.now() THEN
+    RAISE EXCEPTION 'This invite has expired' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF pg_catalog.lower(v_invite.email) <> v_user_email THEN
+    RAISE EXCEPTION 'This invite was sent to a different email address'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF v_invite.role NOT IN ('member', 'admin') THEN
+    RAISE EXCEPTION 'This invite has an invalid role' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.workspace_members (workspace_id, user_id, role)
+  VALUES (v_invite.workspace_id, v_user_id, v_invite.role)
+  ON CONFLICT (workspace_id, user_id) DO NOTHING;
+
+  UPDATE public.workspace_invites
+  SET status = 'accepted'
+  WHERE id = v_invite.id;
+
+  RETURN v_invite.workspace_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.accept_workspace_invite(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.accept_workspace_invite(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.accept_workspace_invite(uuid) TO authenticated;
+CREATE TABLE IF NOT EXISTS public.workspace_secrets (
+  workspace_id uuid PRIMARY KEY REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  late_api_key_encrypted text,
+  ai_api_key text,
+  webhook_secret text
+);
+
+CREATE TABLE IF NOT EXISTS public.channel_secrets (
+  channel_id uuid PRIMARY KEY REFERENCES public.channels(id) ON DELETE CASCADE,
+  webhook_secret text
+);
+
+INSERT INTO public.workspace_secrets (
+  workspace_id,
+  late_api_key_encrypted,
+  ai_api_key,
+  webhook_secret
+)
+SELECT
+  id,
+  late_api_key_encrypted,
+  ai_api_key,
+  webhook_secret
+FROM public.workspaces
+ON CONFLICT (workspace_id) DO NOTHING;
+
+INSERT INTO public.channel_secrets (channel_id, webhook_secret)
+SELECT id, webhook_secret
+FROM public.channels
+WHERE webhook_secret IS NOT NULL
+ON CONFLICT (channel_id) DO NOTHING;
+
+ALTER TABLE public.workspace_secrets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channel_secrets ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.workspace_secrets FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.channel_secrets FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.workspace_secrets TO service_role;
+GRANT ALL ON TABLE public.channel_secrets TO service_role;
+
+DROP POLICY IF EXISTS "Users can update their workspaces" ON public.workspaces;
+CREATE POLICY "Owners and admins can update their workspaces"
+  ON public.workspaces FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = workspaces.id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = workspaces.id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+ALTER TABLE public.workspaces
+  DROP COLUMN IF EXISTS late_api_key_encrypted,
+  DROP COLUMN IF EXISTS ai_api_key,
+  DROP COLUMN IF EXISTS webhook_secret;
+
+ALTER TABLE public.channels
+  DROP COLUMN IF EXISTS webhook_secret;
+DROP POLICY IF EXISTS "Users can view contact channels via contact" ON public.contact_channels;
+DROP POLICY IF EXISTS "Users can manage contact channels" ON public.contact_channels;
+CREATE POLICY "Users can view contact channels in one workspace"
+  ON public.contact_channels FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.channels ch ON ch.id = contact_channels.channel_id
+      WHERE c.id = contact_channels.contact_id
+        AND c.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  );
+CREATE POLICY "Users can manage contact channels in one workspace"
+  ON public.contact_channels FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.channels ch ON ch.id = contact_channels.channel_id
+      WHERE c.id = contact_channels.contact_id
+        AND c.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.channels ch ON ch.id = contact_channels.channel_id
+      WHERE c.id = contact_channels.contact_id
+        AND c.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view contact tags" ON public.contact_tags;
+DROP POLICY IF EXISTS "Users can manage contact tags" ON public.contact_tags;
+CREATE POLICY "Users can view contact tags in one workspace"
+  ON public.contact_tags FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.tags t ON t.id = contact_tags.tag_id
+      WHERE c.id = contact_tags.contact_id
+        AND c.workspace_id = t.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  );
+CREATE POLICY "Users can manage contact tags in one workspace"
+  ON public.contact_tags FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.tags t ON t.id = contact_tags.tag_id
+      WHERE c.id = contact_tags.contact_id
+        AND c.workspace_id = t.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.tags t ON t.id = contact_tags.tag_id
+      WHERE c.id = contact_tags.contact_id
+        AND c.workspace_id = t.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view contact custom fields" ON public.contact_custom_fields;
+DROP POLICY IF EXISTS "Users can manage contact custom fields" ON public.contact_custom_fields;
+CREATE POLICY "Users can view contact custom fields in one workspace"
+  ON public.contact_custom_fields FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.custom_field_definitions d ON d.id = contact_custom_fields.field_id
+      WHERE c.id = contact_custom_fields.contact_id
+        AND c.workspace_id = d.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  );
+CREATE POLICY "Users can manage contact custom fields in one workspace"
+  ON public.contact_custom_fields FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.custom_field_definitions d ON d.id = contact_custom_fields.field_id
+      WHERE c.id = contact_custom_fields.contact_id
+        AND c.workspace_id = d.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.contacts c
+      JOIN public.custom_field_definitions d ON d.id = contact_custom_fields.field_id
+      WHERE c.id = contact_custom_fields.contact_id
+        AND c.workspace_id = d.workspace_id
+        AND public.is_workspace_member(c.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view triggers via flow" ON public.triggers;
+DROP POLICY IF EXISTS "Users can manage triggers via flow" ON public.triggers;
+CREATE POLICY "Users can view triggers in one workspace"
+  ON public.triggers FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.flows f
+      LEFT JOIN public.channels ch ON ch.id = triggers.channel_id
+      WHERE f.id = triggers.flow_id
+        AND (triggers.channel_id IS NULL OR ch.workspace_id = f.workspace_id)
+        AND public.is_workspace_member(f.workspace_id)
+    )
+  );
+CREATE POLICY "Users can manage triggers in one workspace"
+  ON public.triggers FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.flows f
+      LEFT JOIN public.channels ch ON ch.id = triggers.channel_id
+      WHERE f.id = triggers.flow_id
+        AND (triggers.channel_id IS NULL OR ch.workspace_id = f.workspace_id)
+        AND public.is_workspace_member(f.workspace_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.flows f
+      LEFT JOIN public.channels ch ON ch.id = triggers.channel_id
+      WHERE f.id = triggers.flow_id
+        AND (triggers.channel_id IS NULL OR ch.workspace_id = f.workspace_id)
+        AND public.is_workspace_member(f.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view flow sessions via flow" ON public.flow_sessions;
+CREATE POLICY "Users can view flow sessions in one workspace"
+  ON public.flow_sessions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.flows f
+      JOIN public.contacts c ON c.id = flow_sessions.contact_id
+      JOIN public.channels ch ON ch.id = flow_sessions.channel_id
+      WHERE f.id = flow_sessions.flow_id
+        AND c.workspace_id = f.workspace_id
+        AND ch.workspace_id = f.workspace_id
+        AND public.is_workspace_member(f.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view conversations in their workspaces" ON public.conversations;
+DROP POLICY IF EXISTS "Users can manage conversations in their workspaces" ON public.conversations;
+CREATE POLICY "Users can view consistent conversations in their workspaces"
+  ON public.conversations FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.channels ch
+      JOIN public.contacts c ON c.id = conversations.contact_id
+      WHERE ch.id = conversations.channel_id
+        AND conversations.workspace_id = ch.workspace_id
+        AND conversations.workspace_id = c.workspace_id
+        AND public.is_workspace_member(conversations.workspace_id)
+    )
+  );
+CREATE POLICY "Users can manage consistent conversations in their workspaces"
+  ON public.conversations FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.channels ch
+      JOIN public.contacts c ON c.id = conversations.contact_id
+      WHERE ch.id = conversations.channel_id
+        AND conversations.workspace_id = ch.workspace_id
+        AND conversations.workspace_id = c.workspace_id
+        AND public.is_workspace_member(conversations.workspace_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.channels ch
+      JOIN public.contacts c ON c.id = conversations.contact_id
+      WHERE ch.id = conversations.channel_id
+        AND conversations.workspace_id = ch.workspace_id
+        AND conversations.workspace_id = c.workspace_id
+        AND public.is_workspace_member(conversations.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view messages via conversation" ON public.messages;
+DROP POLICY IF EXISTS "Users can insert messages via conversation" ON public.messages;
+CREATE POLICY "Users can view messages in one workspace"
+  ON public.messages FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.conversations conv
+      JOIN public.channels ch ON ch.id = conv.channel_id
+      JOIN public.contacts c ON c.id = conv.contact_id
+      LEFT JOIN public.flows f ON f.id = messages.sent_by_flow_id
+      WHERE conv.id = messages.conversation_id
+        AND conv.workspace_id = ch.workspace_id
+        AND conv.workspace_id = c.workspace_id
+        AND (messages.sent_by_flow_id IS NULL OR f.workspace_id = conv.workspace_id)
+        AND public.is_workspace_member(conv.workspace_id)
+    )
+  );
+CREATE POLICY "Users can insert messages in one workspace"
+  ON public.messages FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.conversations conv
+      JOIN public.channels ch ON ch.id = conv.channel_id
+      JOIN public.contacts c ON c.id = conv.contact_id
+      LEFT JOIN public.flows f ON f.id = messages.sent_by_flow_id
+      WHERE conv.id = messages.conversation_id
+        AND conv.workspace_id = ch.workspace_id
+        AND conv.workspace_id = c.workspace_id
+        AND (messages.sent_by_flow_id IS NULL OR f.workspace_id = conv.workspace_id)
+        AND public.is_workspace_member(conv.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "enrollments_via_sequence" ON public.sequence_enrollments;
+CREATE POLICY "enrollments_via_sequence_in_one_workspace"
+  ON public.sequence_enrollments FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.sequences s
+      JOIN public.contacts c ON c.id = sequence_enrollments.contact_id
+      JOIN public.channels ch ON ch.id = sequence_enrollments.channel_id
+      WHERE s.id = sequence_enrollments.sequence_id
+        AND s.workspace_id = c.workspace_id
+        AND s.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(s.workspace_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.sequences s
+      JOIN public.contacts c ON c.id = sequence_enrollments.contact_id
+      JOIN public.channels ch ON ch.id = sequence_enrollments.channel_id
+      WHERE s.id = sequence_enrollments.sequence_id
+        AND s.workspace_id = c.workspace_id
+        AND s.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(s.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view broadcast recipients" ON public.broadcast_recipients;
+DROP POLICY IF EXISTS "Users can insert broadcast recipients" ON public.broadcast_recipients;
+DROP POLICY IF EXISTS "Users can update broadcast recipients" ON public.broadcast_recipients;
+CREATE POLICY "Users can view broadcast recipients in one workspace"
+  ON public.broadcast_recipients FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.broadcasts b
+      JOIN public.contacts c ON c.id = broadcast_recipients.contact_id
+      JOIN public.channels ch ON ch.id = broadcast_recipients.channel_id
+      WHERE b.id = broadcast_recipients.broadcast_id
+        AND b.workspace_id = c.workspace_id
+        AND b.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(b.workspace_id)
+    )
+  );
+CREATE POLICY "Users can insert broadcast recipients in one workspace"
+  ON public.broadcast_recipients FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.broadcasts b
+      JOIN public.contacts c ON c.id = broadcast_recipients.contact_id
+      JOIN public.channels ch ON ch.id = broadcast_recipients.channel_id
+      WHERE b.id = broadcast_recipients.broadcast_id
+        AND b.workspace_id = c.workspace_id
+        AND b.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(b.workspace_id)
+    )
+  );
+CREATE POLICY "Users can update broadcast recipients in one workspace"
+  ON public.broadcast_recipients FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.broadcasts b
+      JOIN public.contacts c ON c.id = broadcast_recipients.contact_id
+      JOIN public.channels ch ON ch.id = broadcast_recipients.channel_id
+      WHERE b.id = broadcast_recipients.broadcast_id
+        AND b.workspace_id = c.workspace_id
+        AND b.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(b.workspace_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.broadcasts b
+      JOIN public.contacts c ON c.id = broadcast_recipients.contact_id
+      JOIN public.channels ch ON ch.id = broadcast_recipients.channel_id
+      WHERE b.id = broadcast_recipients.broadcast_id
+        AND b.workspace_id = c.workspace_id
+        AND b.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(b.workspace_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view analytics in their workspaces" ON public.analytics_events;
+DROP POLICY IF EXISTS "Users can insert analytics in their workspaces" ON public.analytics_events;
+CREATE POLICY "Users can view analytics with consistent references"
+  ON public.analytics_events FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.workspaces w
+      LEFT JOIN public.flows f ON f.id = analytics_events.flow_id
+      LEFT JOIN public.contacts c ON c.id = analytics_events.contact_id
+      WHERE w.id = analytics_events.workspace_id
+        AND (analytics_events.flow_id IS NULL OR f.workspace_id = w.id)
+        AND (analytics_events.contact_id IS NULL OR c.workspace_id = w.id)
+        AND public.is_workspace_member(w.id)
+    )
+  );
+CREATE POLICY "Users can insert analytics with consistent references"
+  ON public.analytics_events FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.workspaces w
+      LEFT JOIN public.flows f ON f.id = analytics_events.flow_id
+      LEFT JOIN public.contacts c ON c.id = analytics_events.contact_id
+      WHERE w.id = analytics_events.workspace_id
+        AND (analytics_events.flow_id IS NULL OR f.workspace_id = w.id)
+        AND (analytics_events.contact_id IS NULL OR c.workspace_id = w.id)
+        AND public.is_workspace_member(w.id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view comment logs in their workspace" ON public.comment_logs;
+CREATE POLICY "Users can view comment logs with consistent references"
+  ON public.comment_logs FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.channels ch
+      LEFT JOIN public.triggers t ON t.id = comment_logs.matched_trigger_id
+      LEFT JOIN public.flows f ON f.id = t.flow_id
+      WHERE ch.id = comment_logs.channel_id
+        AND ch.workspace_id = comment_logs.workspace_id
+        AND (
+          comment_logs.matched_trigger_id IS NULL
+          OR f.workspace_id = comment_logs.workspace_id
+        )
+        AND public.is_workspace_member(comment_logs.workspace_id)
+    )
+  );
+DROP POLICY IF EXISTS "Users can manage channels in their workspaces" ON public.channels;
+CREATE POLICY "Owners and admins can manage channels"
+  ON public.channels FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = channels.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = channels.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can manage flows in their workspaces" ON public.flows;
+CREATE POLICY "Owners and admins can manage flows"
+  ON public.flows FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = flows.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = flows.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can manage triggers in one workspace" ON public.triggers;
+CREATE POLICY "Owners and admins can manage triggers in one workspace"
+  ON public.triggers FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.flows f
+      LEFT JOIN public.channels ch ON ch.id = triggers.channel_id
+      JOIN public.workspace_members wm ON wm.workspace_id = f.workspace_id
+      WHERE f.id = triggers.flow_id
+        AND (triggers.channel_id IS NULL OR ch.workspace_id = f.workspace_id)
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.flows f
+      LEFT JOIN public.channels ch ON ch.id = triggers.channel_id
+      JOIN public.workspace_members wm ON wm.workspace_id = f.workspace_id
+      WHERE f.id = triggers.flow_id
+        AND (triggers.channel_id IS NULL OR ch.workspace_id = f.workspace_id)
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "sequences_workspace" ON public.sequences;
+CREATE POLICY "Members can view sequences in their workspaces"
+  ON public.sequences FOR SELECT
+  USING (public.is_workspace_member(workspace_id));
+CREATE POLICY "Owners and admins can manage sequences"
+  ON public.sequences FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = sequences.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = sequences.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "enrollments_via_sequence_in_one_workspace" ON public.sequence_enrollments;
+CREATE POLICY "Members can view enrollments in one workspace"
+  ON public.sequence_enrollments FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.sequences s
+      JOIN public.contacts c ON c.id = sequence_enrollments.contact_id
+      JOIN public.channels ch ON ch.id = sequence_enrollments.channel_id
+      WHERE s.id = sequence_enrollments.sequence_id
+        AND s.workspace_id = c.workspace_id
+        AND s.workspace_id = ch.workspace_id
+        AND public.is_workspace_member(s.workspace_id)
+    )
+  );
+CREATE POLICY "Owners and admins can manage enrollments in one workspace"
+  ON public.sequence_enrollments FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.sequences s
+      JOIN public.contacts c ON c.id = sequence_enrollments.contact_id
+      JOIN public.channels ch ON ch.id = sequence_enrollments.channel_id
+      JOIN public.workspace_members wm ON wm.workspace_id = s.workspace_id
+      WHERE s.id = sequence_enrollments.sequence_id
+        AND s.workspace_id = c.workspace_id
+        AND s.workspace_id = ch.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.sequences s
+      JOIN public.contacts c ON c.id = sequence_enrollments.contact_id
+      JOIN public.channels ch ON ch.id = sequence_enrollments.channel_id
+      JOIN public.workspace_members wm ON wm.workspace_id = s.workspace_id
+      WHERE s.id = sequence_enrollments.sequence_id
+        AND s.workspace_id = c.workspace_id
+        AND s.workspace_id = ch.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can manage broadcasts in their workspaces" ON public.broadcasts;
+CREATE POLICY "Owners and admins can manage broadcasts"
+  ON public.broadcasts FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = broadcasts.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.workspace_members wm
+      WHERE wm.workspace_id = broadcasts.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can insert broadcast recipients in one workspace" ON public.broadcast_recipients;
+DROP POLICY IF EXISTS "Users can update broadcast recipients in one workspace" ON public.broadcast_recipients;
+CREATE POLICY "Owners and admins can insert broadcast recipients in one workspace"
+  ON public.broadcast_recipients FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.broadcasts b
+      JOIN public.contacts c ON c.id = broadcast_recipients.contact_id
+      JOIN public.channels ch ON ch.id = broadcast_recipients.channel_id
+      JOIN public.workspace_members wm ON wm.workspace_id = b.workspace_id
+      WHERE b.id = broadcast_recipients.broadcast_id
+        AND b.workspace_id = c.workspace_id
+        AND b.workspace_id = ch.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+CREATE POLICY "Owners and admins can update broadcast recipients in one workspace"
+  ON public.broadcast_recipients FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.broadcasts b
+      JOIN public.contacts c ON c.id = broadcast_recipients.contact_id
+      JOIN public.channels ch ON ch.id = broadcast_recipients.channel_id
+      JOIN public.workspace_members wm ON wm.workspace_id = b.workspace_id
+      WHERE b.id = broadcast_recipients.broadcast_id
+        AND b.workspace_id = c.workspace_id
+        AND b.workspace_id = ch.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.broadcasts b
+      JOIN public.contacts c ON c.id = broadcast_recipients.contact_id
+      JOIN public.channels ch ON ch.id = broadcast_recipients.channel_id
+      JOIN public.workspace_members wm ON wm.workspace_id = b.workspace_id
+      WHERE b.id = broadcast_recipients.broadcast_id
+        AND b.workspace_id = c.workspace_id
+        AND b.workspace_id = ch.workspace_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );
+
+DROP POLICY IF EXISTS "flow_versions_insert" ON public.flow_versions;
+CREATE POLICY "Owners and admins can insert flow versions"
+  ON public.flow_versions FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.flows f
+      JOIN public.workspace_members wm ON wm.workspace_id = f.workspace_id
+      WHERE f.id = flow_versions.flow_id
+        AND wm.user_id = auth.uid()
+        AND wm.role IN ('owner', 'admin')
+    )
+  );

@@ -1,5 +1,5 @@
 /**
- * The platforms ZernFlow can drive. Zernio itself connects many more (TikTok,
+ * The platforms Sayl can drive. Zernio itself connects many more (TikTok,
  * YouTube, LinkedIn, ads accounts...), but only these expose the DM inbox that
  * flows, sequences and broadcasts are built on, so account sync skips the rest.
  */
@@ -14,6 +14,34 @@ export const PLATFORMS = [
 ] as const;
 
 export type Platform = (typeof PLATFORMS)[number];
+
+const DEFAULT_ENABLED_PLATFORMS = [
+  "whatsapp",
+  "instagram",
+  "facebook",
+  "telegram",
+] as const satisfies readonly Platform[];
+
+export function getEnabledPlatforms(
+  configuredPlatforms: string | undefined
+): Platform[] {
+  if (configuredPlatforms === undefined || configuredPlatforms.trim() === "") {
+    return [...DEFAULT_ENABLED_PLATFORMS];
+  }
+
+  const enabled = new Set(
+    configuredPlatforms
+      .split(",")
+      .map((platform) => platform.trim().toLowerCase())
+      .filter((platform): platform is Platform => isSupportedPlatform(platform))
+  );
+
+  return PLATFORMS.filter((platform) => enabled.has(platform));
+}
+
+export const ENABLED_PLATFORMS = getEnabledPlatforms(
+  process.env.NEXT_PUBLIC_ENABLED_CHANNELS
+);
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   instagram: "Instagram",

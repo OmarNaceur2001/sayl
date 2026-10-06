@@ -5,7 +5,7 @@ import { Plus, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/types/database";
-import { PLATFORMS, PLATFORM_LABELS } from "@/lib/platforms";
+import { ENABLED_PLATFORMS, PLATFORM_LABELS } from "@/lib/platforms";
 
 type Tag = Database["public"]["Tables"]["tags"]["Row"];
 type CustomFieldDef =
@@ -253,7 +253,7 @@ function FilterRuleRow({
             className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="">Select platform...</option>
-            {PLATFORMS.map((p) => (
+            {ENABLED_PLATFORMS.map((p) => (
               <option key={p} value={p}>
                 {PLATFORM_LABELS[p]}
               </option>

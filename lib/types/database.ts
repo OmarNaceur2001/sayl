@@ -72,8 +72,6 @@ export interface Database {
           id: string;
           name: string;
           slug: string;
-          late_api_key_encrypted: string | null;
-          ai_api_key: string | null;
           ai_provider: string;
           global_keywords: Json | null;
           created_at: string;
@@ -83,8 +81,6 @@ export interface Database {
           id?: string;
           name: string;
           slug: string;
-          late_api_key_encrypted?: string | null;
-          ai_api_key?: string | null;
           ai_provider?: string;
           global_keywords?: Json | null;
           created_at?: string;
@@ -94,13 +90,61 @@ export interface Database {
           id?: string;
           name?: string;
           slug?: string;
-          late_api_key_encrypted?: string | null;
-          ai_api_key?: string | null;
           ai_provider?: string;
           global_keywords?: Json | null;
           updated_at?: string;
         };
         Relationships: [];
+      };
+      workspace_secrets: {
+        Row: {
+          workspace_id: string;
+          late_api_key_encrypted: string | null;
+          ai_api_key: string | null;
+          webhook_secret: string | null;
+        };
+        Insert: {
+          workspace_id: string;
+          late_api_key_encrypted?: string | null;
+          ai_api_key?: string | null;
+          webhook_secret?: string | null;
+        };
+        Update: {
+          late_api_key_encrypted?: string | null;
+          ai_api_key?: string | null;
+          webhook_secret?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workspace_secrets_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: true;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      channel_secrets: {
+        Row: {
+          channel_id: string;
+          webhook_secret: string | null;
+        };
+        Insert: {
+          channel_id: string;
+          webhook_secret?: string | null;
+        };
+        Update: {
+          webhook_secret?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "channel_secrets_channel_id_fkey";
+            columns: ["channel_id"];
+            isOneToOne: true;
+            referencedRelation: "channels";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       workspace_members: {
         Row: {
@@ -138,7 +182,6 @@ export interface Database {
           display_name: string | null;
           profile_picture: string | null;
           webhook_id: string | null;
-          webhook_secret: string | null;
           is_active: boolean;
           last_comment_cursor: string | null;
           comment_rules: Json | null;
@@ -154,7 +197,6 @@ export interface Database {
           display_name?: string | null;
           profile_picture?: string | null;
           webhook_id?: string | null;
-          webhook_secret?: string | null;
           is_active?: boolean;
           last_comment_cursor?: string | null;
           comment_rules?: Json | null;
@@ -168,7 +210,6 @@ export interface Database {
           display_name?: string | null;
           profile_picture?: string | null;
           webhook_id?: string | null;
-          webhook_secret?: string | null;
           is_active?: boolean;
           last_comment_cursor?: string | null;
           comment_rules?: Json | null;
@@ -1078,6 +1119,12 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
+      accept_workspace_invite: {
+        Args: {
+          p_invite_id: string;
+        };
+        Returns: string;
+      };
       increment_unread: {
         Args: {
           conv_id: string;

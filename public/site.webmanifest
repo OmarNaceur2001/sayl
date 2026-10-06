@@ -1,11 +1,11 @@
 {
-  "name": "ZernFlow",
-  "short_name": "ZernFlow",
+  "name": "Sayl",
+  "short_name": "Sayl",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ],
-  "theme_color": "#6366f1",
-  "background_color": "#ffffff",
+  "theme_color": "#0A0705",
+  "background_color": "#0A0705",
   "display": "standalone"
 }

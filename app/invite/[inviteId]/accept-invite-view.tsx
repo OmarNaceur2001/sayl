@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Users, Crown, Shield, User, Loader2 } from "lucide-react";
-import { acceptInvite } from "@/lib/actions/team";
+import { acceptWorkspaceInvite } from "@/lib/actions/team";
 import Link from "next/link";
 
 const roleIcons: Record<string, React.ReactNode> = {
@@ -35,14 +35,15 @@ export function AcceptInviteView({
   const [error, setError] = useState<string | null>(null);
 
   const emailMismatch =
-    isLoggedIn && currentUserEmail && currentUserEmail !== email;
+    isLoggedIn &&
+    currentUserEmail?.toLowerCase() !== email.toLowerCase();
 
   async function handleAccept() {
     if (accepting) return;
     setAccepting(true);
     setError(null);
 
-    const result = await acceptInvite(inviteId);
+    const result = await acceptWorkspaceInvite(inviteId);
 
     if (result.error) {
       setError(result.error);

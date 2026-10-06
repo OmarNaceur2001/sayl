@@ -4,12 +4,11 @@ import {
   Geist,
   IBM_Plex_Sans_Arabic,
   Instrument_Serif,
-  Inter,
 } from "next/font/google";
 import "./globals.css";
 import "./sayl-theme.css";
+import { brand } from "@/lib/brand";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -30,22 +29,20 @@ const ibmPlexArabic = IBM_Plex_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: {
-    default: "Sayl — Social messaging automation for teams",
-    template: "%s | Sayl",
+    default: `${brand.name} — ${brand.tagline}`,
+    template: `%s | ${brand.name}`,
   },
-  description:
-    "Automatisez vos conversations sociales, vos messages privés et vos workflows avec Sayl.",
+  description: brand.tagline,
   openGraph: {
-    title: "Sayl — Social messaging automation for teams",
-    description: "Automatisez vos conversations sociales et vos workflows avec Sayl.",
-    siteName: "Sayl",
+    title: `${brand.name} — ${brand.tagline}`,
+    description: brand.tagline,
+    siteName: brand.name,
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sayl — Social messaging automation for teams",
-    description:
-      "Automatisez les conversations sur plusieurs plateformes sociales avec Sayl.",
+    title: `${brand.name} — ${brand.tagline}`,
+    description: brand.tagline,
   },
   icons: {
     icon: "/sayl-mark.svg",
@@ -61,7 +58,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geist.variable} ${instrumentSerif.variable} ${dmMono.variable} ${ibmPlexArabic.variable}`}
+      className={`${geist.variable} ${instrumentSerif.variable} ${dmMono.variable} ${ibmPlexArabic.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -71,11 +68,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body
-        className={`${inter.className}`}
-      >
-        {children}
-      </body>
+      <body className={geist.className}>{children}</body>
     </html>
   );
 }

@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { PLATFORMS, PLATFORM_LABELS, isSupportedPlatform, platformLabel } from "./platforms";
+import {
+  ENABLED_PLATFORMS,
+  PLATFORMS,
+  PLATFORM_LABELS,
+  getEnabledPlatforms,
+  isSupportedPlatform,
+  platformLabel,
+} from "./platforms";
 
 /**
  * Issue #16: the channel picker offered WhatsApp, the connect route rejected it
@@ -9,6 +16,34 @@ import { PLATFORMS, PLATFORM_LABELS, isSupportedPlatform, platformLabel } from "
  * carried its own copy of the list. These tests pin them to PLATFORMS.
  */
 describe("platform allowlist", () => {
+  it("defaults the enabled channel picker to the priority platforms", () => {
+    const defaults = [
+      "whatsapp",
+      "instagram",
+      "facebook",
+      "telegram",
+    ];
+
+    expect(getEnabledPlatforms(undefined)).toEqual(defaults);
+    expect(getEnabledPlatforms("")).toEqual(defaults);
+  });
+
+  it("uses the configured value for the picker allowlist", () => {
+    expect(ENABLED_PLATFORMS).toEqual(
+      getEnabledPlatforms(process.env.NEXT_PUBLIC_ENABLED_CHANNELS)
+    );
+  });
+
+  it("parses the configured enabled channel list without enabling unsupported platforms", () => {
+    expect(
+      getEnabledPlatforms(" Twitter, bluesky, whatsapp, invalid, Twitter ")
+    ).toEqual([
+      "whatsapp",
+      "twitter",
+      "bluesky",
+    ]);
+  });
+
   it("labels every supported platform", () => {
     for (const platform of PLATFORMS) {
       expect(PLATFORM_LABELS[platform]).toBeTruthy();
@@ -18,7 +53,7 @@ describe("platform allowlist", () => {
   it("accepts supported platforms and rejects everything else", () => {
     expect(isSupportedPlatform("whatsapp")).toBe(true);
     expect(isSupportedPlatform("instagram")).toBe(true);
-    // Zernio connects these, ZernFlow has no inbox for them.
+    // Zernio connects these, Sayl has no inbox for them.
     expect(isSupportedPlatform("tiktok")).toBe(false);
     expect(isSupportedPlatform("youtube")).toBe(false);
     expect(isSupportedPlatform(undefined)).toBe(false);

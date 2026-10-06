@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ensureWebhookRegistered,
   generateWebhookSecret,
+  getWebhookSignatureFailure,
   getOrCreateWorkspaceWebhookSecret,
   resolveWebhookSecret,
   verifyWebhookSignature,
@@ -15,7 +16,10 @@ interface CapturedUpdate {
   patch: Record<string, unknown>;
 }
 
-function makeFakeSupabase(seed: { webhook_secret?: string | null }) {
+function makeFakeSupabase(seed: {
+  webhook_secret?: string | null;
+  channel_webhook_secret?: string | null;
+}) {
   const updates: CapturedUpdate[] = [];
   const client = {
     from(table: string) {
@@ -26,16 +30,19 @@ function makeFakeSupabase(seed: { webhook_secret?: string | null }) {
         eq() {
           return this;
         },
+        maybeSingle() {
+          const webhook_secret = table === "channel_secrets"
+            ? seed.channel_webhook_secret ?? null
+            : seed.webhook_secret ?? null;
+          return Promise.resolve({ data: webhook_secret ? { webhook_secret } : null, error: null });
+        },
         single() {
           return Promise.resolve({ data: { webhook_secret: seed.webhook_secret ?? null }, error: null });
         },
-        update(patch: Record<string, unknown>) {
-          return {
-            eq() {
-              updates.push({ table, patch });
-              return Promise.resolve({ data: null, error: null });
-            },
-          };
+        upsert(patch: Record<string, unknown>) {
+          updates.push({ table, patch });
+          seed.webhook_secret = patch.webhook_secret as string;
+          return Promise.resolve({ data: null, error: null });
         },
       };
     },
@@ -60,16 +67,15 @@ function fakeZernio(existing: Array<Record<string, unknown>>) {
 }
 
 const opts = {
-  appUrl: "https://app.zernflow.test",
+  appUrl: "https://app.sayl.example",
   secret: "s3cr3t",
   events: ["message.received", "comment.received"] as const,
 };
-const EXPECTED_URL = "https://app.zernflow.test/api/webhooks/late";
+const EXPECTED_URL = "https://app.sayl.example/api/webhooks/late";
 
 describe("ensureWebhookRegistered", () => {
   it("creates the webhook when none exists (AC1)", async () => {
     const z = fakeZernio([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("created");
@@ -89,7 +95,6 @@ describe("ensureWebhookRegistered", () => {
     const z = fakeZernio([
       { _id: "wh1", name: WEBHOOK_NAME, url: EXPECTED_URL, secret: "s3cr3t", events: ["message.received", "comment.received"] },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("unchanged");
@@ -101,7 +106,6 @@ describe("ensureWebhookRegistered", () => {
     const z = fakeZernio([
       { _id: "wh1", name: WEBHOOK_NAME, url: "https://old.example/api/webhooks/late", events: ["message.received", "comment.received"] },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("updated");
@@ -122,7 +126,6 @@ describe("ensureWebhookRegistered", () => {
     const z = fakeZernio([
       { _id: "wh1", name: WEBHOOK_NAME, url: EXPECTED_URL, secret: "old-secret", events: ["message.received", "comment.received"] },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("updated");
@@ -141,7 +144,6 @@ describe("ensureWebhookRegistered", () => {
     const z = fakeZernio([
       { _id: "wh1", name: WEBHOOK_NAME, url: EXPECTED_URL, events: ["message.received"] },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("updated");
@@ -151,9 +153,8 @@ describe("ensureWebhookRegistered", () => {
   it("strips whitespace from appUrl (newline in env var corrupted the registered URL, #10)", async () => {
     const z = fakeZernio([]);
     await ensureWebhookRegistered(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       z.client as any,
-      { ...opts, appUrl: "https://app.zernflow.test\n", events: [...opts.events] },
+      { ...opts, appUrl: "https://app.sayl.example\n", events: [...opts.events] },
     );
 
     expect(z.create).toHaveBeenCalledWith({
@@ -171,9 +172,8 @@ describe("ensureWebhookRegistered", () => {
       { _id: "wh1", name: WEBHOOK_NAME, url: EXPECTED_URL, secret: "s3cr3t", events: ["message.received", "comment.received"] },
     ]);
     const res = await ensureWebhookRegistered(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       z.client as any,
-      { ...opts, appUrl: "https://app.zernflow.test/", events: [...opts.events] },
+      { ...opts, appUrl: "https://app.sayl.example/", events: [...opts.events] },
     );
 
     expect(res.action).toBe("unchanged");
@@ -188,7 +188,6 @@ describe("ensureWebhookRegistered", () => {
         events: ["message.received", "comment.received"],
       },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("updated");
@@ -213,7 +212,6 @@ describe("ensureWebhookRegistered", () => {
         events: ["message.received", "comment.received"],
       },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     // Same path but url differs (query token) → update to strip it and set our secret.
@@ -226,7 +224,6 @@ describe("ensureWebhookRegistered", () => {
       { _id: "a", name: "Other A", url: "https://x.example/hook", events: [] },
       { _id: "b", name: "Other B", url: "https://y.example/hook", events: [] },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("created");
@@ -243,7 +240,6 @@ describe("ensureWebhookRegistered", () => {
         events: ["message.received"],
       },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await ensureWebhookRegistered(z.client as any, { ...opts, events: [...opts.events] });
 
     expect(res.action).toBe("created");
@@ -279,7 +275,7 @@ describe("getOrCreateWorkspaceWebhookSecret", () => {
     expect(secret).toMatch(/^[0-9a-f]{64}$/);
     expect(fake.updates).toHaveLength(1);
     expect(fake.updates[0]).toMatchObject({
-      table: "workspaces",
+      table: "workspace_secrets",
       patch: { webhook_secret: secret },
     });
   });
@@ -307,21 +303,46 @@ describe("verifyWebhookSignature (AC4)", () => {
   });
 });
 
+describe("getWebhookSignatureFailure", () => {
+  const secret = "workspace-secret";
+  const body = '{"event":"message.received"}';
+  const validSig = createHmac("sha256", secret).update(body).digest("hex");
+
+  it("rejects a missing configured secret", () => {
+    expect(getWebhookSignatureFailure(null, body, validSig)).toBe("missing_secret");
+  });
+
+  it("rejects a missing signature", () => {
+    expect(getWebhookSignatureFailure(secret, body, null)).toBe("invalid_signature");
+  });
+
+  it("rejects an invalid signature", () => {
+    expect(getWebhookSignatureFailure(secret, body, "deadbeef")).toBe("invalid_signature");
+  });
+
+  it("accepts a valid signature", () => {
+    expect(getWebhookSignatureFailure(secret, body, validSig)).toBeNull();
+  });
+});
+
 describe("resolveWebhookSecret (AC4)", () => {
   it("prefers the workspace secret over the channel secret", async () => {
     const fake = makeFakeSupabase({ webhook_secret: "ws-secret" });
     const secret = await resolveWebhookSecret(fake.client, {
+      id: "channel-1",
       workspace_id: "ws-1",
-      webhook_secret: "legacy-channel-secret",
     });
     expect(secret).toBe("ws-secret");
   });
 
-  it("falls back to the legacy channel secret when workspace has none", async () => {
-    const fake = makeFakeSupabase({ webhook_secret: null });
+  it("falls back to the migrated channel secret when workspace has none", async () => {
+    const fake = makeFakeSupabase({
+      webhook_secret: null,
+      channel_webhook_secret: "legacy-channel-secret",
+    });
     const secret = await resolveWebhookSecret(fake.client, {
+      id: "channel-1",
       workspace_id: "ws-1",
-      webhook_secret: "legacy-channel-secret",
     });
     expect(secret).toBe("legacy-channel-secret");
   });
@@ -329,8 +350,8 @@ describe("resolveWebhookSecret (AC4)", () => {
   it("returns null when neither secret is set", async () => {
     const fake = makeFakeSupabase({ webhook_secret: null });
     const secret = await resolveWebhookSecret(fake.client, {
+      id: "channel-1",
       workspace_id: "ws-1",
-      webhook_secret: null,
     });
     expect(secret).toBeNull();
   });

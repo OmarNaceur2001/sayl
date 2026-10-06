@@ -9,6 +9,8 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/dashboard/", "/api/", "/invite/"],
       },
     ],
-    sitemap: "https://zernflow.com/sitemap.xml",
+    sitemap: `${(
+      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    ).replace(/\/$/, "")}/sitemap.xml`,
   };
 }
