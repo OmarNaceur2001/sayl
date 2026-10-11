@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Upload, Download, Loader2, GitBranch, FileJson, X, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { Json } from "@/lib/types/database";
+import { useTranslations } from "next-intl";
 
 interface FlowExportData {
   name: string;
@@ -138,6 +139,7 @@ export function DeleteFlowButton({
 }
 
 export function ImportFlowButton() {
+  const t = useTranslations("flows");
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -155,13 +157,13 @@ export function ImportFlowButton() {
       const data = JSON.parse(text);
 
       if (!isValidFlowData(data)) {
-        throw new Error("Invalid flow file. Expected name, nodes, and edges.");
+        throw new Error(t("invalidFlow"));
       }
 
       setPreview(data);
     } catch (err) {
       if (err instanceof SyntaxError) {
-        setError("Invalid JSON file");
+        setError(t("invalidJson"));
       } else {
         setError(err instanceof Error ? err.message : "Invalid file");
       }
@@ -236,7 +238,7 @@ export function ImportFlowButton() {
         ) : (
           <Upload className="h-4 w-4" />
         )}
-        {importing ? "Importing..." : "Import"}
+        {importing ? t("importing") : t("import")}
       </button>
 
       {error && (
@@ -254,7 +256,7 @@ export function ImportFlowButton() {
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{preview.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {nodeCount} {nodeCount === 1 ? "node" : "nodes"} · {edgeCount} {edgeCount === 1 ? "connection" : "connections"}
+                  {nodeCount} {t(nodeCount === 1 ? "node" : "nodes")} · {edgeCount} {edgeCount === 1 ? "connection" : "connections"}
                 </p>
               </div>
             </div>
@@ -268,7 +270,7 @@ export function ImportFlowButton() {
                 onClick={() => setPreview(null)}
                 className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 onClick={handleConfirmImport}
@@ -276,7 +278,7 @@ export function ImportFlowButton() {
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {importing && <Loader2 className="h-4 w-4 animate-spin" />}
-                {importing ? "Importing..." : "Import"}
+                {importing ? t("importing") : t("import")}
               </button>
             </div>
           </div>

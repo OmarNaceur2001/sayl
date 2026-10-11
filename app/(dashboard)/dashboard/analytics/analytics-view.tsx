@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import type { LanguageMessageCounts } from "@/lib/language/analytics";
+import { countMessagesByLanguage } from "@/lib/language/analytics";
+import { LANGUAGE_LABELS } from "@/components/contact-language";
 
 // --- Types ---
 
@@ -50,6 +53,7 @@ interface AnalyticsData {
   flowPerformance: FlowPerformance[];
   contactGrowth: DailyCount[];
   messageVolume: DailyMessages[];
+  messagesByLanguage: LanguageMessageCounts;
 }
 
 // --- Helpers ---
@@ -209,6 +213,7 @@ export function AnalyticsView({
   const [flowPerformance, setFlowPerformance] = useState<FlowPerformance[]>(initialData.flowPerformance);
   const [contactGrowth, setContactGrowth] = useState<DailyCount[]>(initialData.contactGrowth);
   const [messageVolume, setMessageVolume] = useState<DailyMessages[]>(initialData.messageVolume);
+  const [messagesByLanguage, setMessagesByLanguage] = useState(initialData.messagesByLanguage);
 
   // Only refetch when user changes time range away from the default 30d
   useEffect(() => {
@@ -218,6 +223,7 @@ export function AnalyticsView({
       setFlowPerformance(initialData.flowPerformance);
       setContactGrowth(initialData.contactGrowth);
       setMessageVolume(initialData.messageVolume);
+      setMessagesByLanguage(initialData.messagesByLanguage);
       return;
     }
     fetchAnalytics();
@@ -233,7 +239,7 @@ export function AnalyticsView({
         : getDateRange(timeRange);
 
     try {
-      const [flowsRes, contactsRes, sentRes, failedRes, startsRes, completionsRes, flowsListRes, contactEvents, msgEvents] = await Promise.all([
+      const [flowsRes, contactsRes, sentRes, failedRes, startsRes, completionsRes, flowsListRes, contactEvents, msgEvents, languageMessages] = await Promise.all([
         supabase
           .from("flows")
           .select("*", { count: "exact", head: true })
@@ -291,6 +297,13 @@ export function AnalyticsView({
           .gte("created_at", range.start)
           .lte("created_at", range.end)
           .order("created_at"),
+        supabase
+          .from("messages")
+          .select("conversation_id, conversations!inner(language)")
+          .eq("direction", "outbound")
+          .eq("conversations.workspace_id", workspaceId)
+          .gte("created_at", range.start)
+          .lte("created_at", range.end),
       ]);
 
       setStats({
@@ -356,6 +369,13 @@ export function AnalyticsView({
         msgData.push({ date: dayStr, sent: sentByDay.get(dayStr) ?? 0, failed: failedByDay.get(dayStr) ?? 0 });
       }
       setMessageVolume(msgData);
+      setMessagesByLanguage(
+        countMessagesByLanguage(
+          (languageMessages.data ?? []).map((message) => ({
+            language: message.conversations.language,
+          }))
+        )
+      );
     } catch (err) {
       console.error("Failed to fetch analytics:", err);
     } finally {
@@ -502,6 +522,22 @@ export function AnalyticsView({
                 </div>
               ))}
             </div>
+
+            {/* Charts row */}
+            <section className="rounded-xl border border-border bg-card p-6">
+              <h3 className="text-sm font-semibold">Messages by language</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Outbound messages in this period</p>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {(["fr", "en", "ar", "tn", "unknown"] as const).map((language) => (
+                  <div key={language} className="rounded-lg bg-muted/50 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">
+                      {language === "unknown" ? "Unknown" : LANGUAGE_LABELS[language]}
+                    </p>
+                    <p className="mt-1 text-lg font-semibold">{messagesByLanguage[language]}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             {/* Charts row */}
             <div className="grid gap-6 lg:grid-cols-2">

@@ -4,27 +4,28 @@ import { GitBranch, Sparkles, Plug } from "lucide-react";
 import { CreateFlowButton } from "@/components/create-flow-button";
 import { ImportFlowButton, ExportFlowButton, DeleteFlowButton } from "@/components/flow-actions";
 import type { FlowStatus } from "@/lib/types/database";
+import { getLocale, getTranslations } from "next-intl/server";
 
-const statusConfig: Record<FlowStatus, { label: string; classes: string }> = {
+const statusConfig: Record<FlowStatus, { label: "draft" | "published" | "archived"; classes: string }> = {
   draft: {
-    label: "Draft",
+    label: "draft",
     classes:
       "bg-muted text-muted-foreground",
   },
   published: {
-    label: "Published",
+    label: "published",
     classes:
       "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   },
   archived: {
-    label: "Archived",
+    label: "archived",
     classes:
       "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   },
 };
 
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString("en-US", {
+function formatDate(dateString: string, locale: string) {
+  return new Date(dateString).toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -34,6 +35,8 @@ function formatDate(dateString: string) {
 }
 
 export default async function FlowsPage() {
+  const t = await getTranslations("flows");
+  const locale = await getLocale();
   const { workspace, supabase } = await getWorkspace();
 
   const [{ data: flows }, { count: channelCount }] = await Promise.all([
@@ -54,9 +57,9 @@ export default async function FlowsPage() {
       <div className="border-b border-border px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Flows</h1>
+            <h1 className="text-2xl font-bold">{t("title")}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Build automated chatbot flows for your channels
+              {t("description")}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -66,7 +69,7 @@ export default async function FlowsPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
               <Sparkles className="h-4 w-4" />
-              Templates
+              {t("templates")}
             </Link>
             <CreateFlowButton />
           </div>
@@ -80,16 +83,16 @@ export default async function FlowsPage() {
             <Plug className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium">Connect a channel to get started</p>
+            <p className="text-sm font-medium">{t("connectTitle")}</p>
             <p className="text-xs text-muted-foreground">
-              Link your social media accounts so your flows can send and receive messages.
+              {t("connectDescription")}
             </p>
           </div>
           <Link
             href="/dashboard/channels"
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            Connect
+            {t("connect")}
           </Link>
         </div>
       )}
@@ -97,9 +100,9 @@ export default async function FlowsPage() {
       {!flows || flows.length === 0 ? (
         <div className="mt-12 rounded-xl border border-dashed border-border p-12 text-center">
           <GitBranch className="mx-auto h-10 w-10 text-muted-foreground" />
-          <h2 className="mt-4 text-lg font-semibold">No flows yet</h2>
+          <h2 className="mt-4 text-lg font-semibold">{t("emptyTitle")}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Create your first flow to start automating conversations.
+            {t("emptyDescription")}
           </p>
           <div className="mt-4">
             <CreateFlowButton />
@@ -130,11 +133,11 @@ export default async function FlowsPage() {
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${status.classes}`}
                         >
-                          {status.label}
+                          {t(status.label)}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
+                        {nodeCount} {t(nodeCount === 1 ? "node" : "nodes")}
                       </p>
                     </div>
                   </div>
@@ -144,7 +147,7 @@ export default async function FlowsPage() {
                   </div>
                 </div>
                 <p className="mt-4 text-xs text-muted-foreground">
-                  Updated {formatDate(flow.updated_at)}
+                  {t("updated", { date: formatDate(flow.updated_at, locale) })}
                 </p>
               </Link>
             );

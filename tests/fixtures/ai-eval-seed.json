@@ -1,0 +1,39 @@
+{
+  "synthetic": true,
+  "note": "Seed set written by hand. Replace/extend with REAL merchant messages (Stage 1 dataset) before trusting the scores.",
+  "systemPrompt": "Tu es l'assistant WhatsApp de la boutique de vetements Dar Mode a Sousse. Sois chaleureux et bref.",
+  "kb": [
+    "Livraison : 7 DT partout en Tunisie, delai 24 a 48 h. Livraison gratuite a partir de 150 DT d'achat.",
+    "Paiement : a la livraison (cash) ou par carte bancaire en ligne (D17, Flouci).",
+    "Retour : echange ou remboursement sous 7 jours si l'article est non porte avec son etiquette.",
+    "Horaires de la boutique : du lundi au samedi de 9h a 19h. Ferme le dimanche.",
+    "Robe d'ete Lina : 89 DT. Tailles S, M, L, XL. Couleurs : blanc, bleu, rose.",
+    "Sac Nour : 129 DT. Disponible en noir et beige. Stock limite.",
+    "Adresse : 12 rue de la Corniche, Sousse.",
+    "Commande : confirmation par message sous 2 heures ouvrables. Nous avons besoin du nom, du telephone et de l'adresse complete."
+  ],
+  "cases": [
+    { "id": "fr-01", "lang": "fr", "message": "Bonjour, vous livrez a Sfax ? C'est combien ?", "expect": { "handover": false, "mustMatch": ["7"] } },
+    { "id": "fr-02", "lang": "fr", "message": "Vous etes ouverts le dimanche ?", "expect": { "handover": false, "mustMatch": ["ferm"] } },
+    { "id": "fr-03", "lang": "fr", "message": "Je peux payer a la livraison ?", "expect": { "handover": false, "mustMatch": ["livraison|cash|esp"] } },
+    { "id": "fr-04", "lang": "fr", "message": "Combien coute la robe Lina et quelles tailles ?", "expect": { "handover": false, "mustMatch": ["89", "XL"] } },
+    { "id": "fr-05", "lang": "fr", "message": "Vous vendez des voitures ?", "expect": { "handover": true } },
+    { "id": "fr-06", "lang": "fr", "message": "Je veux etre rembourse immediatement, c'est inadmissible, appelez-moi.", "expect": { "handover": true } },
+    { "id": "en-01", "lang": "en", "message": "Hi, how much is delivery to Sousse?", "expect": { "handover": false, "mustMatch": ["7"] } },
+    { "id": "en-02", "lang": "en", "message": "Can I return a dress if it doesn't fit?", "expect": { "handover": false, "mustMatch": ["7"] } },
+    { "id": "en-03", "lang": "en", "message": "What are your opening hours?", "expect": { "handover": false, "mustMatch": ["9", "(19|7)"] } },
+    { "id": "en-04", "lang": "en", "message": "Do you sell iPhones?", "expect": { "handover": true } },
+    { "id": "ar-01", "lang": "ar", "message": "كم سعر التوصيل؟", "expect": { "handover": false, "mustMatch": ["[7٧]"] } },
+    { "id": "ar-02", "lang": "ar", "message": "ما هي ساعات العمل؟", "expect": { "handover": false, "mustMatch": ["[9٩]"] } },
+    { "id": "ar-03", "lang": "ar", "message": "هل يمكنني إرجاع المنتج؟", "expect": { "handover": false, "mustMatch": ["[7٧]"] } },
+    { "id": "ar-04", "lang": "ar", "message": "هل تبيعون السيارات؟", "expect": { "handover": true } },
+    { "id": "tn-01", "lang": "tn", "message": "بقداش التوصيل لصفاقس؟", "expect": { "handover": false, "mustMatch": ["[7٧]"] } },
+    { "id": "tn-02", "lang": "tn", "message": "9adech el livraison l sfax ?", "expect": { "handover": false, "mustMatch": ["7"] } },
+    { "id": "tn-03", "lang": "tn", "message": "famma robe Lina ? 9adech soumha w chnowa el tailles ?", "expect": { "handover": false, "mustMatch": ["89", "XL"] } },
+    { "id": "tn-04", "lang": "tn", "message": "نجم نخلص كاش وقت التسليم؟", "expect": { "handover": false } },
+    { "id": "tn-05", "lang": "tn", "message": "yaatik essa7a, n7eb nkalem wahed mta3 el service client", "expect": { "handover": true } },
+    { "id": "tn-06", "lang": "tn", "message": "chnowa el 3onwen mta3kom bech nji ?", "expect": { "handover": false, "mustMatch": ["Corniche|كورنيش"] } },
+    { "id": "tn-07", "lang": "tn", "message": "3andkom sac Nour behi ? 9adech ?", "expect": { "handover": false, "mustMatch": ["129"] } },
+    { "id": "tn-08", "lang": "tn", "message": "n7eb na3ref wa9tech tji el commande", "expect": { "handover": false, "mustMatch": ["24|48"] } }
+  ]
+}

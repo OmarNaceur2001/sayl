@@ -2,7 +2,7 @@ import { getWorkspace } from "@/lib/workspace";
 import { ContactsView } from "./contacts-view";
 
 export default async function ContactsPage() {
-  const { workspace, supabase } = await getWorkspace();
+  const { workspace, supabase, role } = await getWorkspace();
 
   const [contactsRes, tagsRes] = await Promise.all([
     supabase
@@ -23,6 +23,7 @@ export default async function ContactsPage() {
       contacts={contactsRes.data ?? []}
       tags={tagsRes.data ?? []}
       workspaceId={workspace.id}
+      canManageLanguages={role === "owner" || role === "admin"}
     />
   );
 }

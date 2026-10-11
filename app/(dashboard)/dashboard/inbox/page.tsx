@@ -2,7 +2,7 @@ import { getWorkspace } from "@/lib/workspace";
 import { InboxView } from "./inbox-view";
 
 export default async function InboxPage() {
-  const { workspace, supabase } = await getWorkspace();
+  const { workspace, supabase, role } = await getWorkspace();
 
   const { data: conversations } = await supabase
     .from("conversations")
@@ -15,6 +15,7 @@ export default async function InboxPage() {
     <InboxView
       conversations={conversations ?? []}
       workspaceId={workspace.id}
+      canManageLanguages={role === "owner" || role === "admin"}
     />
   );
 }

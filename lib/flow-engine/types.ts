@@ -1,5 +1,5 @@
-import type { NodeType, Platform } from "@/lib/types/database";
-import type { LanguageTranslations } from "@/lib/language/pick-text";
+import type { NodeType, Platform, SupportedLanguage } from "@/lib/types/database";
+import type { LanguageTranslations, LocalizedText } from "@/lib/language/pick-text";
 
 export interface FlowNode {
   id: string;
@@ -155,6 +155,25 @@ export interface AiResponseNodeData {
    * {{ai_response}} without double-sending. Defaults to true for back-compat.
    */
   sendDirectly?: boolean;
+  /** Reply language: "auto" (default) follows the customer; or force one language. */
+  replyLanguage?: "auto" | SupportedLanguage;
+  /** Ground answers in the workspace knowledge base (RAG). Default false. */
+  useKnowledgeBase?: boolean;
+  /**
+   * With the knowledge base on: only answer from retrieved passages and hand the
+   * conversation to a human when nothing relevant is found. Default true.
+   */
+  answerOnlyFromKb?: boolean;
+  /** Minimum cosine similarity (0-1) for a passage to count as relevant. Default 0.25. */
+  kbMinSimilarity?: number;
+  /**
+   * On AI/send failure (or when the model asks for a human): tell the customer,
+   * pause automation and flag the conversation instead of failing silently.
+   * Default true.
+   */
+  handoverOnFailure?: boolean;
+  /** Custom message sent to the customer on handover (per language). */
+  fallbackMessage?: LocalizedText;
 }
 
 export interface EnrollSequenceNodeData {

@@ -57,6 +57,9 @@ export type SequenceStatus = "draft" | "active" | "paused";
 export type SequenceEnrollmentStatus = "active" | "completed" | "cancelled";
 export type SupportedLanguage = "fr" | "en" | "ar" | "tn";
 export type LanguageSource = "detected" | "manual" | "default";
+export type KbDocumentKind = "faq" | "text" | "csv";
+export type UsageEventKind = "ai_response" | "embedding";
+export type UsageEventStatus = "ok" | "handover" | "failed";
 
 export interface SequenceStep {
   type: "message" | "delay";
@@ -1134,6 +1137,126 @@ export interface Database {
           },
         ];
       };
+      kb_documents: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          title: string;
+          kind: KbDocumentKind;
+          language: SupportedLanguage | null;
+          chunk_count: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          title: string;
+          kind?: KbDocumentKind;
+          language?: SupportedLanguage | null;
+          chunk_count?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          title?: string;
+          kind?: KbDocumentKind;
+          language?: SupportedLanguage | null;
+          chunk_count?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "kb_documents_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      kb_chunks: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          document_id: string;
+          position: number;
+          content: string;
+          /** pgvector value, serialised as "[0.1,0.2,...]" */
+          embedding: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          document_id: string;
+          position?: number;
+          content: string;
+          embedding: string;
+          created_at?: string;
+        };
+        Update: {
+          content?: string;
+          embedding?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "kb_chunks_document_id_workspace_id_fkey";
+            columns: ["document_id", "workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "kb_documents";
+            referencedColumns: ["id", "workspace_id"];
+          },
+        ];
+      };
+      usage_events: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          flow_id: string | null;
+          contact_id: string | null;
+          conversation_id: string | null;
+          kind: UsageEventKind;
+          model: string | null;
+          language: SupportedLanguage | null;
+          input_tokens: number;
+          output_tokens: number;
+          cost_usd: number | null;
+          status: UsageEventStatus;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          flow_id?: string | null;
+          contact_id?: string | null;
+          conversation_id?: string | null;
+          kind: UsageEventKind;
+          model?: string | null;
+          language?: SupportedLanguage | null;
+          input_tokens?: number;
+          output_tokens?: number;
+          cost_usd?: number | null;
+          status?: UsageEventStatus;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          status?: UsageEventStatus;
+          metadata?: Json | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "usage_events_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -1163,6 +1286,20 @@ export interface Database {
           b_id: string;
         };
         Returns: undefined;
+      };
+      match_kb_chunks: {
+        Args: {
+          p_workspace_id: string;
+          p_query_embedding: string;
+          p_match_count?: number;
+          p_min_similarity?: number;
+        };
+        Returns: Array<{
+          id: string;
+          document_id: string;
+          content: string;
+          similarity: number;
+        }>;
       };
     };
     Enums: {

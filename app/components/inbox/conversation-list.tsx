@@ -5,6 +5,7 @@ import { Search, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/platform-icon";
+import { ContactLanguage } from "@/components/contact-language";
 import type { Database, Platform, ConversationStatus } from "@/lib/types/database";
 
 type Conversation = Database["public"]["Tables"]["conversations"]["Row"] & {
@@ -198,6 +199,12 @@ export function ConversationList({
                   <p className="truncate text-sm font-medium">
                     {conversation.contacts?.display_name ?? "Unknown"}
                   </p>
+                  {conversation.contacts && (
+                    <ContactLanguage
+                      contactId={conversation.contacts.id}
+                      language={conversation.contacts.language}
+                    />
+                  )}
                   <span
                     suppressHydrationWarning
                     className="flex-shrink-0 text-[11px] text-muted-foreground"

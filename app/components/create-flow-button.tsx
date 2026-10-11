@@ -3,8 +3,10 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function CreateFlowButton() {
+  const t = useTranslations("flows");
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const pendingRef = useRef(false);
@@ -49,7 +51,7 @@ export function CreateFlowButton() {
       ) : (
         <Plus className="h-4 w-4" />
       )}
-      {creating ? "Creating..." : "New Flow"}
+      {creating ? t("creating") : t("newFlow")}
     </button>
   );
 }

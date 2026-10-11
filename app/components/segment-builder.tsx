@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/types/database";
 import { ENABLED_PLATFORMS, PLATFORM_LABELS } from "@/lib/platforms";
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from "@/components/contact-language";
 
 type Tag = Database["public"]["Tables"]["tags"]["Row"];
 type CustomFieldDef =
@@ -27,6 +28,7 @@ export type FilterField =
   | "missing_tag"
   | "custom_field"
   | "platform"
+  | "language"
   | "is_subscribed"
   | "last_interaction";
 
@@ -55,7 +57,7 @@ const fieldConfig: Record<
   {
     label: string;
     operators: { value: FilterOperator; label: string }[];
-    valueType: "tag" | "custom_field" | "platform" | "boolean" | "date" | "text";
+    valueType: "tag" | "custom_field" | "platform" | "language" | "boolean" | "date" | "text";
   }
 > = {
   has_tag: {
@@ -86,6 +88,14 @@ const fieldConfig: Record<
       { value: "not_equals", label: "is not" },
     ],
     valueType: "platform",
+  },
+  language: {
+    label: "Language",
+    operators: [
+      { value: "equals", label: "is" },
+      { value: "not_equals", label: "is not" },
+    ],
+    valueType: "language",
   },
   is_subscribed: {
     label: "Subscribed",
@@ -256,6 +266,21 @@ function FilterRuleRow({
             {ENABLED_PLATFORMS.map((p) => (
               <option key={p} value={p}>
                 {PLATFORM_LABELS[p]}
+              </option>
+            ))}
+          </select>
+        );
+      case "language":
+        return (
+          <select
+            value={rule.value}
+            onChange={(e) => onChange({ ...rule, value: e.target.value })}
+            className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Select language...</option>
+            {SUPPORTED_LANGUAGES.map((language) => (
+              <option key={language} value={language}>
+                {LANGUAGE_LABELS[language]}
               </option>
             ))}
           </select>

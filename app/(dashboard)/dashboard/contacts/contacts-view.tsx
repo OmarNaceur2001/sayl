@@ -19,6 +19,12 @@ import {
   type SegmentFilter,
 } from "@/components/segment-builder";
 import type { Database } from "@/lib/types/database";
+import type { SupportedLanguage } from "@/lib/types/database";
+import {
+  ContactLanguage,
+  LANGUAGE_LABELS,
+  SUPPORTED_LANGUAGES,
+} from "@/components/contact-language";
 
 type Tag = Database["public"]["Tables"]["tags"]["Row"];
 type ContactWithTags = Database["public"]["Tables"]["contacts"]["Row"] & {
@@ -45,13 +51,16 @@ export function ContactsView({
   contacts,
   tags,
   workspaceId,
+  canManageLanguages,
 }: {
   contacts: ContactWithTags[];
   tags: Tag[];
   workspaceId: string;
+  canManageLanguages: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  const [languageFilter, setLanguageFilter] = useState<SupportedLanguage | "all" | "unset">("all");
   const [showSegmentBuilder, setShowSegmentBuilder] = useState(false);
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>(
     createEmptyFilter()
@@ -71,6 +80,14 @@ export function ContactsView({
         (ct) => ct.tag_id === selectedTagId
       );
       if (!hasTag) return false;
+    }
+    if (languageFilter === "unset" && contact.language !== null) return false;
+    if (
+      languageFilter !== "all" &&
+      languageFilter !== "unset" &&
+      contact.language !== languageFilter
+    ) {
+      return false;
     }
     return true;
   });
@@ -118,6 +135,22 @@ export function ContactsView({
               )}
             />
           </button>
+          <select
+            aria-label="Filter contacts by language"
+            value={languageFilter}
+            onChange={(event) =>
+              setLanguageFilter(event.target.value as SupportedLanguage | "all" | "unset")
+            }
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+          >
+            <option value="all">All languages</option>
+            <option value="unset">Not set</option>
+            {SUPPORTED_LANGUAGES.map((language) => (
+              <option key={language} value={language}>
+                {LANGUAGE_LABELS[language]}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Segment builder */}
@@ -196,6 +229,9 @@ export function ContactsView({
                   Email
                 </th>
                 <th className="px-4 py-3 text-xs font-medium uppercase text-muted-foreground">
+                  Language
+                </th>
+                <th className="px-4 py-3 text-xs font-medium uppercase text-muted-foreground">
                   Last Interaction
                 </th>
                 <th className="px-4 py-3 text-xs font-medium uppercase text-muted-foreground">
@@ -250,6 +286,13 @@ export function ContactsView({
                           No email
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <ContactLanguage
+                        contactId={contact.id}
+                        language={contact.language}
+                        editable={canManageLanguages}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <span className="flex items-center gap-1.5 text-sm text-muted-foreground">

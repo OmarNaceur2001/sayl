@@ -1,5 +1,6 @@
 import { getWorkspace } from "@/lib/workspace";
 import { AnalyticsView } from "./analytics-view";
+import { countMessagesByLanguage } from "@/lib/language/analytics";
 
 export default async function AnalyticsPage() {
   const { workspace, supabase } = await getWorkspace();
@@ -21,6 +22,7 @@ export default async function AnalyticsPage() {
     flowsListRes,
     contactEvents,
     msgEvents,
+    languageMessages,
   ] = await Promise.all([
     supabase
       .from("flows")
@@ -79,6 +81,13 @@ export default async function AnalyticsPage() {
       .gte("created_at", thirtyDaysAgo)
       .lte("created_at", now)
       .order("created_at"),
+    supabase
+      .from("messages")
+      .select("conversation_id, conversations!inner(language)")
+      .eq("direction", "outbound")
+      .eq("conversations.workspace_id", workspace.id)
+      .gte("created_at", thirtyDaysAgo)
+      .lte("created_at", now),
   ]);
 
   // Build flow performance data
@@ -152,6 +161,11 @@ export default async function AnalyticsPage() {
         flowPerformance,
         contactGrowth,
         messageVolume,
+        messagesByLanguage: countMessagesByLanguage(
+          (languageMessages.data ?? []).map((message) => ({
+            language: message.conversations.language,
+          }))
+        ),
       }}
     />
   );

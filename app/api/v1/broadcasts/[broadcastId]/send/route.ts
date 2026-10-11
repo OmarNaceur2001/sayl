@@ -3,7 +3,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { requireWorkspaceRole } from "@/lib/auth/require-role";
 import { scheduleBroadcastDelivery } from "@/lib/scheduler";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json, Platform } from "@/lib/types/database";
+import type { Database, Json, Platform, SupportedLanguage } from "@/lib/types/database";
 
 interface SegmentRule {
   field: string;
@@ -323,6 +323,20 @@ async function evaluateRule(
         return new Set(contactIds.filter((id) => !linkedSet.has(id)));
       }
       return linkedSet;
+    }
+
+    case "language": {
+      const { data: contacts } = await supabase
+        .from("contacts")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .in("id", contactIds)
+        .eq("language", rule.value as SupportedLanguage);
+      const matching = new Set((contacts ?? []).map((contact) => contact.id));
+      if (rule.operator === "not_equals") {
+        return new Set(contactIds.filter((contactId) => !matching.has(contactId)));
+      }
+      return matching;
     }
 
     case "is_subscribed": {

@@ -12,6 +12,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/platform-icon";
+import { ContactLanguage } from "@/components/contact-language";
 import type { Database, Platform } from "@/lib/types/database";
 
 type Contact = Database["public"]["Tables"]["contacts"]["Row"];
@@ -45,10 +46,14 @@ function formatDate(dateStr: string | null): string {
 export function ContactPanel({
   contactId,
   workspaceId,
+  canManageLanguage,
+  onLanguageChange,
   onClose,
 }: {
   contactId: string | null;
   workspaceId: string;
+  canManageLanguage: boolean;
+  onLanguageChange: (language: "fr" | "en" | "ar" | "tn") => void;
   onClose: () => void;
 }) {
   const [loadedDetails, setDetails] = useState<ContactDetails | null>(null);
@@ -148,6 +153,29 @@ export function ContactPanel({
             <p className="mt-3 text-sm font-semibold">
               {details.contact.display_name ?? "Unknown"}
             </p>
+            <div className="mt-2">
+              <ContactLanguage
+                contactId={details.contact.id}
+                language={details.contact.language}
+                editable={canManageLanguage}
+                onLanguageChange={(language) => {
+                  setDetails((current) =>
+                    current
+                      ? {
+                          ...current,
+                          contact: {
+                            ...current.contact,
+                            language,
+                            language_source: "manual",
+                            language_confidence: 1,
+                          },
+                        }
+                      : current
+                  );
+                  onLanguageChange(language);
+                }}
+              />
+            </div>
             {details.contact.email && (
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {details.contact.email}

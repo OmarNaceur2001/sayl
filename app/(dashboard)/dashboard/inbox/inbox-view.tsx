@@ -18,9 +18,11 @@ type Message = Database["public"]["Tables"]["messages"]["Row"];
 export function InboxView({
   conversations,
   workspaceId,
+  canManageLanguages,
 }: {
   conversations: Conversation[];
   workspaceId: string;
+  canManageLanguages: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Conversation | null>(null);
@@ -54,6 +56,13 @@ export function InboxView({
   const handleSelect = useCallback((c: Conversation) => {
     setSelected(c);
   }, []);
+
+  const handleLanguageChange = useCallback((language: "fr" | "en" | "ar" | "tn") => {
+    setSelected((current) =>
+      current?.contacts ? { ...current, contacts: { ...current.contacts, language } } : current
+    );
+    router.refresh();
+  }, [router]);
 
   // Load messages when a conversation is selected
   useEffect(() => {
@@ -163,6 +172,8 @@ export function InboxView({
         <ContactPanel
           contactId={selected.contact_id}
           workspaceId={workspaceId}
+          canManageLanguage={canManageLanguages}
+          onLanguageChange={handleLanguageChange}
           onClose={() => setShowContactPanel(false)}
         />
       )}

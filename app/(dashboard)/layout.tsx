@@ -1,5 +1,6 @@
 import { getWorkspace } from "@/lib/workspace";
 import { Sidebar } from "@/components/sidebar";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 export default async function DashboardLayout({
   children,
@@ -23,7 +24,12 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen">
       <Sidebar workspace={workspace} user={user} workspaces={workspaces} />
-      <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-12 shrink-0 items-center justify-end border-b border-border bg-card px-4">
+          <LocaleSwitcher />
+        </header>
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      </main>
     </div>
   );
 }
