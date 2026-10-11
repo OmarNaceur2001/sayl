@@ -164,7 +164,7 @@ describe("executeAiResponse", () => {
 
     expect(result).toBe("pause");
     const sent = sendInboxMessage.mock.calls[0][0].body.message as string;
-    expect(sent).toContain("الميساج"); // Tunisian default fallback
+    expect(sent).toContain("وصلتنا"); // Tunisian default fallback
     expect(sent).not.toContain("Sorry I cannot help");
     expect(updates).toContainEqual({ table: "conversations", patch: { is_automation_paused: true } });
     expect(updates.find((u) => u.table === "flow_sessions")?.patch).toMatchObject({ status: "completed" });
