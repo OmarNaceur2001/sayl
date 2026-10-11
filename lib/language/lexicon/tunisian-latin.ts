@@ -1,28 +1,28 @@
-// Starter lexicon for Tunisian Latin/Arabizi. Expand with reviewed user messages.
+// Tunisian Latin/Arabizi lexicon.
+// STRONG = not a French/English word and specific to Maghrebi/Tunisian usage.
+// WEAK   = shared with other dialects/pan-Arabic expressions; needs 2+ hits.
+// Words that are also plain English/French (win, bara, taw, mela, haw, ani...)
+// were removed: they flagged "I want to win" as Darija.
+// Digit-based Arabizi tokens (3andkom, 7ajti, n7eb, 9adech) are handled
+// generically in detect.ts, so they do not need to be listed here.
+export const TUNISIAN_LATIN_STRONG = [
+  "chnowa", "chnoua", "chneya", "chniya", "chnia", "chnahwelek", "chnawlek",
+  "kifech", "kifach", "barcha", "barsha", "tawa", "tawwa", "famma", "fama",
+  "fammach", "mafamach", "ma famech", "behi", "behya", "yezzi", "yizzi", "mouch",
+  "mouchi", "manich", "chkoun", "chkon", "aslema", "labes", "labess", "mrigel",
+  "mriguel", "mrigla", "ghodwa", "ghadwa", "sbeh", "mta3", "mte3", "mta3i",
+  "mte3i", "mta3ek", "mte3ek", "mta3na", "mte3na", "mta3kom", "mte3kom",
+  "hedha", "hedhi", "hedhouma", "soum", "chhal", "ya3tik essa7a", "yaatik essa7a",
+  "wallahi", "elli", "ma najemch", "ma najjemch",
+] as const;
+
+export const TUNISIAN_LATIN_WEAK = [
+  "yalla", "wallah", "walah", "inchallah", "inshallah", "inchalah", "saha",
+  "mela", "yaser", "yasser", "bech", "bch", "hakka", "rani", "rahou", "rahi",
+  "rahia", "chouf", "choufli", "labes 3lik",
+] as const;
+
 export const TUNISIAN_LATIN_MARKERS = [
-  "3leh", "3lech", "3lash", "9adech", "9addech", "9addeh", "chnowa",
-  "chneya", "chnia", "chniya", "chneya", "kifech", "kifach", "kifeh",
-  "barcha", "barsha", "barsha barcha", "tawa", "taw", "tawwa", "fama",
-  "famma", "fammach", "ma famech", "mafamach", "behi", "bhe", "behya",
-  "yezzi", "yizzi", "yesser", "yaser", "5ater", "khater", "mouch", "mouch",
-  "mouchi", "mech", "manich", "ma3andich", "ma3andekch", "ma3andouch",
-  "n7eb", "nheb", "n7ib", "najem", "najjem", "najjemch", "ma najemch",
-  "ma najjemch", "bch", "bech", "bach", "chkon", "chkoun", "win", "winek",
-  "wa9tech", "wa9tech", "wa9t", "wa9teh", "3aslema", "aslema", "labes",
-  "labess", "labes 3lik", "3aychek", "ya3tik essa7a", "yaatik essa7a",
-  "saha", "s7a", "chnahwelek", "chnawlek", "chnawalek", "chnowa a7welek",
-  "a7na", "tounsi", "tounsia", "tounes", "ghodwa", "lbare7", "bare7",
-  "sbeh", "3chiya", "mrigel", "mriguell", "mrigla", "mela", "yalla",
-  "haw", "hakka", "hakka haka", "hedha", "hedhi", "hedhouma", "ghadi",
-  "lhouni", "zeda", "zeda zeda", "ani", "rani", "rahou", "rahia",
-  "9a3ed", "9a3da", "9a3din", "na9ra", "nekhdem", "nalwej", "nal9a",
-  "na3ref", "na3mel", "na3tik", "ne5ou", "n7ot", "n7i", "nesta7a9",
-  "nestana", "nestaana", "netmana", "nheb n3ref", "famma possibilité",
-  "wallah", "walah", "bel7a9", "belha9", "inchallah", "inshallah",
-  "inchalah", "3aychek barcha", "y3aychek", "yaatik", "b9adech",
-  "9adech soum", "chneya soum", "soum", "souma", "fi tounes", "tawwa",
-  "3andi", "3andek", "3andou", "3andha", "ma3andich", "ma3andnech",
-  "ma3andkomch", "n7ebek", "n7ebkom", "t7eb", "t7ebni", "t7ebou",
-  "ma n7ebch", "ma n7ajemch", "manajjemch", "chwaya", "chwaya barcha",
-  "chouf", "choufli", "bara", "arjaa", "irja3", "okhra", "5ir",
+  ...TUNISIAN_LATIN_STRONG,
+  ...TUNISIAN_LATIN_WEAK,
 ] as const;
