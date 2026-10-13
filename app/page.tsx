@@ -1,28 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   ArrowRight,
   Check,
-  CheckCircle,
-  GitBranch,
-  Heart,
-  Link2,
-  ListOrdered,
-  MessageCircle,
-  MessageSquare,
-  Radio,
+  ChevronDown,
+  MessageSquareText,
   Sparkles,
+  Store,
+  Target,
   TrendingUp,
   Users,
-  X,
   Zap,
   type LucideIcon,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/platform-icon";
 import { SaylLogo } from "@/components/sayl-logo";
-import { brand } from "@/lib/brand";
 
 const platforms = [
   { name: "Instagram", platform: "instagram" },
@@ -34,210 +28,95 @@ const platforms = [
   { name: "Reddit", platform: "reddit" },
 ];
 
-const comparison = [
-  { feature: "Instagram & Facebook", manychat: true },
-  { feature: "WhatsApp", manychat: true },
-  { feature: "Telegram", manychat: false },
-  { feature: "X / Twitter", manychat: false },
-  { feature: "Bluesky & Reddit", manychat: false },
-  { feature: "Visual flow builder", manychat: true },
-  { feature: "AI responses (BYO key)", manychat: true },
-  { feature: "Choose your AI provider", manychat: false },
-  { feature: "Comment-to-DM", manychat: true },
-  { feature: "Live chat inbox", manychat: true },
-  { feature: "Sequences / drip campaigns", manychat: true },
-  { feature: "Contact CRM", manychat: true },
+const industries: { icon: LucideIcon; title: string; description: string }[] = [
+  { icon: Store, title: "E-commerce", description: "Proposez des offres, gérez les relances et récupérez les paniers abandonnés automatiquement." },
+  { icon: Users, title: "Agences & consultants", description: "Centralisez les demandes, les nouveaux prospects et les suivis client dans un seul espace." },
+  { icon: Sparkles, title: "Créateurs & marques", description: "Répondez aux commentaires, envoyez des liens de DM et renforcez votre audience qualifiée." },
+  { icon: TrendingUp, title: "SaaS & startups", description: "Qualifiez les leads, automatisez l’onboarding et mettez en place des séquences de vente." },
+  { icon: Target, title: "Éducation & coaching", description: "Répondez sans délai aux demandes, envoyez les ressources et planifiez les rendez-vous." },
+  { icon: Zap, title: "Services locaux", description: "Gérez les demandes de devis, les confirmations et les relances depuis vos canaux sociaux." },
 ];
 
-const features: {
-  icon: LucideIcon;
-  title: string;
-  desc: string;
-  preview: string;
-  label: string;
-}[] = [
+const plans = [
   {
-    icon: MessageCircle,
-    title: "Comment-to-DM",
-    desc: "Someone comments a keyword? Instantly DM them your link, offer, or lead magnet.",
-    preview: "Here’s the guide you asked for — enjoy!",
-    label: "COMMENT → DIRECT MESSAGE",
+    name: "Starter",
+    price: "0€",
+    description: "Pour tester Sayl sans friction.",
+    featured: false,
+    features: ["1 canal actif", "Automatisations essentielles", "Support email"],
   },
   {
-    icon: GitBranch,
-    title: "Visual flow builder",
-    desc: "Drag-and-drop conversation flows. Welcome messages, follow-ups, sales funnels. No code.",
-    preview: "When someone says “info”, send a welcome message.",
-    label: "TRIGGER → ACTION → OUTCOME",
+    name: "Pro",
+    price: "39€",
+    description: "Le plus adapté pour une équipe qui scale.",
+    featured: true,
+    badge: "Le plus choisi",
+    features: ["Tous les canaux", "Fils de discussion unifiés", "AI assistant", "Statistiques avancées"],
   },
   {
-    icon: Sparkles,
-    title: "AI responses",
-    desc: "Let AI handle conversations. Pick your provider: OpenAI, Anthropic, or Google. Your API key, your choice.",
-    preview: "I can help with that. What would you like to know?",
-    label: "AI RESPONSE",
-  },
-  {
-    icon: MessageSquare,
-    title: "Live chat inbox",
-    desc: "All your DMs in one place. Bot handles the easy stuff, you jump in when it matters.",
-    preview: "A teammate is joining the conversation now.",
-    label: "TEAM INBOX",
-  },
-  {
-    icon: Users,
-    title: "Contact CRM",
-    desc: "Tag your audience, build segments, track interactions. Right message to the right people.",
-    preview: "Contact tagged: interested",
-    label: "CONTACT UPDATED",
-  },
-  {
-    icon: Radio,
-    title: "Broadcasts",
-    desc: "Send promotions and updates to your audience. Target by tags, platform, or segments.",
-    preview: "Your weekend update is ready to send.",
-    label: "BROADCAST",
-  },
-  {
-    icon: ListOrdered,
-    title: "Sequences",
-    desc: "Drip campaigns that run on autopilot. Message, wait, message. Enroll contacts from flows.",
-    preview: "Message sent  →  wait  →  follow up",
-    label: "AUTOMATED SEQUENCE",
-  },
-  {
-    icon: Link2,
-    title: "Growth tools",
-    desc: "Generate DM starter links for every platform. Share them anywhere to start conversations.",
-    preview: "sayl.app/dm/start?ref=campaign",
-    label: "DM STARTER LINK",
-  },
-  {
-    icon: Zap,
-    title: "Webhooks & API",
-    desc: "Connect to any tool. Push leads to Google Sheets, trigger Zapier, call external APIs.",
-    preview: "New lead  →  Google Sheets  ✓",
-    label: "WEBHOOK DELIVERED",
+    name: "Scale",
+    price: "99€",
+    description: "Pour les marques avec des volumes plus élevés.",
+    featured: false,
+    features: ["Rôles & permissions", "Workflows avancés", "Benchmarks & reporting", "Support prioritaire"],
   },
 ];
 
-const steps: {
-  step: string;
-  icon: LucideIcon;
-  title: string;
-  desc: string;
-}[] = [
+const faqs = [
   {
-    step: "1",
-    icon: CheckCircle,
-    title: "Connect your accounts",
-    desc: "Link your Instagram, Facebook, WhatsApp, Telegram, or any other platform in a few clicks.",
+    question: "Est-ce que Sayl fonctionne avec WhatsApp, Instagram et Facebook ?",
+    answer: "Oui. Sayl permet de piloter plusieurs canaux depuis un même tableau de bord et d’orchestrer des automatisations cohérentes sur votre trafic social.",
   },
   {
-    step: "2",
-    icon: GitBranch,
-    title: "Build a flow",
-    desc: "Use the visual builder to create your automation. Pick a trigger, add messages, set conditions.",
+    question: "Puis-je essayer gratuitement avant de payer ?",
+    answer: "Absolument. Vous pouvez démarrer un essai gratuit pour tester les flux, les messages automatiques et la gestion des conversations avant de choisir un plan.",
   },
   {
-    step: "3",
-    icon: TrendingUp,
-    title: "Watch it grow",
-    desc: "Your flows run 24/7. Capture leads, answer questions, and sell while you sleep.",
+    question: "Quel est le niveau de configuration nécessaire ?",
+    answer: "Aucune compétence technique poussée n’est requise. La plateforme a été pensée pour être rapide à mettre en place, même pour des équipes marketing ou commerciales.",
+  },
+  {
+    question: "Est-ce que je peux connecter mon propre modèle IA ?",
+    answer: "Oui. Sayl permet d’utiliser votre propre clé API et de choisir le fournisseur qui correspond à votre usage et à votre budget.",
   },
 ];
 
-const audiences: {
-  icon: LucideIcon;
-  title: string;
-  desc: string;
-}[] = [
-  {
-    icon: Heart,
-    title: "Creators",
-    desc: "Auto-reply to comments, send lead magnets via DM, and grow your email list from social.",
+const demoContent: Record<"fr" | "ar" | "tn", { label: string; title: string; subtitle: string; message: string; dir: "ltr" | "rtl" }> = {
+  fr: {
+    label: "Français",
+    title: "Réponses instantanées, sans friction",
+    subtitle: "Le bon message, au bon moment, sur le bon canal.",
+    message: "Bonjour ! Voici le guide demandé. J’ai aussi préparé un devis pour votre projet.",
+    dir: "ltr",
   },
-  {
-    icon: TrendingUp,
-    title: "Small businesses",
-    desc: "Qualify leads through DM conversations, answer FAQs instantly, and book appointments on autopilot.",
+  ar: {
+    label: "العربية",
+    title: "ردود فورية بدون تعقيد",
+    subtitle: "الرسالة المناسبة، في الوقت المناسب، على القناة المناسبة.",
+    message: "مرحبًا! هذا هو الدليل المطلوب، كما أعددت لك عرض سعر لمشروعك.",
+    dir: "rtl",
   },
-  {
-    icon: Users,
-    title: "Agencies",
-    desc: "Manage all your clients' accounts in one workspace. Build flows once, reuse them across brands.",
+  tn: {
+    label: "Darija",
+    title: "جواب فوري بلا تعقيد",
+    subtitle: "الرسالة اللي مناسبة، في الوقت المناسب، على القناة المناسبة.",
+    message: "سلامة! هاد هو الدليل اللي طلبته، وعايزك تعرف أني جهّزت لك عرض سعر للمشروع.",
+    dir: "rtl",
   },
-];
-
-const proofPoints = [
-  {
-    label: "7 platforms, one tool",
-    detail:
-      "Instagram, Facebook, WhatsApp, Telegram, X, Bluesky, Reddit. ManyChat supports 3 of these platforms.",
-  },
-  {
-    label: "Try before you choose",
-    detail: "Explore Sayl with a free trial, then continue with a paid subscription.",
-  },
-  {
-    label: "Built for teams",
-    detail: "Bring your shared inbox, contacts, and automations into one workspace.",
-  },
-  {
-    label: "Automation around the clock",
-    detail: "Keep conversations moving while your team focuses on what matters.",
-  },
-];
-
-function Reveal({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-
-    if (!("IntersectionObserver" in window)) return;
-
-    document.documentElement.classList.add("has-intersection-observer");
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.12 }
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div ref={ref} className={`${className}${visible ? " is-visible" : ""}`}>
-      {children}
-    </div>
-  );
-}
+};
 
 function PlatformTicker() {
   return (
-    <div className="platform-ticker" aria-label="Seven supported social platforms">
+    <div className="platform-ticker" aria-label="Plateformes supportées">
       <div className="platform-ticker-track">
         {[0, 1].map((copy) => (
-          <div
-            className="platform-ticker-group"
-            key={copy}
-            aria-hidden={copy === 1}
-          >
+          <div className="platform-ticker-group" key={copy} aria-hidden={copy === 1}>
             {platforms.map((platform) => (
-              <span className="platform-ticker-item" key={platform.platform}>
+              <span
+                className="platform-ticker-item"
+                data-platform={platform.platform}
+                key={`${copy}-${platform.platform}`}
+              >
                 <PlatformIcon platform={platform.platform} size={17} />
                 {platform.name}
               </span>
@@ -250,239 +129,186 @@ function PlatformTicker() {
 }
 
 export default function Home() {
-  const [activeFeature, setActiveFeature] = useState(0);
-  const ActiveFeatureIcon = features[activeFeature].icon;
+  const [activeDemo, setActiveDemo] = useState<keyof typeof demoContent>("fr");
+  const [openFaq, setOpenFaq] = useState(0);
+  const demo = demoContent[activeDemo];
 
   return (
     <div className="marketing-site min-h-screen">
       <nav className="marketing-nav sticky top-0 z-50 border-b backdrop-blur-lg">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="Sayl home">
-            <SaylLogo />
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 py-4">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="Accueil Sayl">
+            <SaylLogo variant="dark" />
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="#comparison"
-              className="hidden min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm text-muted sm:inline-flex"
-            >
-              Compare platforms
-            </Link>
-            <Link href="/login" className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-muted">
-              Log in
-            </Link>
+
+          <div className="nav-links">
+            <Link href="#metiers">Métiers</Link>
+            <Link href="#tarifs">Tarifs</Link>
+            <Link href="#faq">FAQ</Link>
+          </div>
+
+          <div className="nav-actions">
+            <Link href="/login" className="nav-login">Connexion</Link>
             <Link href="/register" className="sayl-button sayl-button-primary min-h-11 px-4 text-sm">
-              Start free trial
+              Essai gratuit
             </Link>
           </div>
         </div>
       </nav>
 
       <main>
-        <section className="hero-section mx-auto max-w-6xl px-6 pb-16 pt-16 sm:pb-20 sm:pt-24">
+        <section className="hero-section mx-auto max-w-6xl px-4 pb-16 pt-16 sm:px-6 sm:pb-20 sm:pt-24">
           <div className="hero-copy">
-            <p className="eyebrow"><span className="signal-dot" /> SOCIAL AUTOMATION, BUILT FOR TEAMS</p>
-            <h1><em>{brand.tagline}</em></h1>
+            <p className="eyebrow"><span className="signal-dot" /> AUTOMATISATION DES CONVERSATIONS</p>
+            <h1>
+              La croissance sociale,
+              <br />
+              <em>sans friction.</em>
+            </h1>
             <p className="hero-description">
-              Automate DMs, comments, and flows across Instagram, Facebook, WhatsApp,
-              Telegram, X, Bluesky, and Reddit. Bring your social conversations and team
-              workflows together in one place.
+              Sayl centralise vos messages, vos comptes et vos automations pour convertir plus de prospects,
+              répondre plus vite et garder votre équipe alignée.
             </p>
             <div className="hero-actions">
               <Link href="/register" className="sayl-button sayl-button-primary min-h-12 px-6">
-                Start your free trial <ArrowRight className="h-4 w-4" />
+                Démarrer mon essai <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="#features" className="sayl-button sayl-button-secondary min-h-12 px-6">
-                Explore Sayl
+              <Link href="#tarifs" className="sayl-button sayl-button-secondary min-h-12 px-6">
+                Voir les tarifs
               </Link>
             </div>
-            <p className="hero-note">
-              Explore Sayl with a free trial. Continue with a paid subscription when you&apos;re ready.
-            </p>
+            <p className="hero-note">Aucun engagement. Vous pouvez arrêter quand vous voulez.</p>
           </div>
 
-          <Reveal className="flow-preview reveal">
-            <div className="flow-preview-top">
-              <div className="window-lights" aria-hidden="true"><i /><i /><i /></div>
-              <span>WELCOME FLOW</span>
-              <span className="flow-status"><span className="signal-dot" /> LIVE PREVIEW</span>
+          <div className="hero-demo">
+            <div className="demo-card" dir={demo.dir}>
+              <div className="demo-toolbar">
+                <div className="window-lights" aria-hidden="true"><i /><i /><i /></div>
+                <div className="demo-switches" aria-label="Choisir la langue de démonstration">
+                  {Object.entries(demoContent).map(([key, option]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={activeDemo === key ? "is-active" : ""}
+                      onClick={() => setActiveDemo(key as keyof typeof demoContent)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="demo-panel">
+                <div className="demo-caption">Live demo</div>
+                <h3>{demo.title}</h3>
+                <p>{demo.subtitle}</p>
+
+                <div className="demo-message">
+                  <span className="message-badge">AI</span>
+                  <div>{demo.message}</div>
+                </div>
+
+                <div className="demo-metrics">
+                  <div>
+                    <strong>2.4x</strong>
+                    <span>plus de leads</span>
+                  </div>
+                  <div>
+                    <strong>24/7</strong>
+                    <span>réponses</span>
+                  </div>
+                  <div>
+                    <strong>7</strong>
+                    <span>canaux</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flow-preview-canvas">
-              <svg className="flow-wires" viewBox="0 0 900 180" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M240 90H330M570 90H660" />
-                <circle className="flow-pulse" r="5">
-                  <animateMotion dur="4.5s" repeatCount="indefinite" path="M240 90H660" />
-                </circle>
-              </svg>
-              <div className="flow-node">
-                <span className="flow-node-icon"><MessageCircle size={16} /></span>
-                <span className="flow-node-label">TRIGGER</span>
-                <strong>Comment trigger</strong>
-                <small>Keyword: “info”</small>
-              </div>
-              <div className="flow-connector" aria-hidden="true"><span /></div>
-              <div className="flow-node">
-                <span className="flow-node-icon"><MessageSquare size={16} /></span>
-                <span className="flow-node-label">ACTION</span>
-                <strong>Send DM</strong>
-                <small>“Hey! Here’s the link...”</small>
-              </div>
-              <div className="flow-connector" aria-hidden="true"><span /></div>
-              <div className="flow-node">
-                <span className="flow-node-icon"><Users size={16} /></span>
-                <span className="flow-node-label">CONTACT</span>
-                <strong>Tag as lead</strong>
-                <small>Tag: “interested”</small>
-              </div>
-            </div>
-          </Reveal>
+          </div>
         </section>
 
-        <section className="platform-section" aria-label="Supported platforms">
-          <div className="mx-auto max-w-6xl px-6 pt-7">
-            <p className="eyebrow text-center">ONE FLOW. SEVEN PLATFORMS.</p>
+        <section className="platform-section" aria-label="Canaux pris en charge">
+          <div className="mx-auto max-w-6xl px-4 pt-7 sm:px-6">
+            <p className="eyebrow text-center">UN SEUL TABLEAU DE BORD POUR TOUS VOS CANAUX</p>
           </div>
           <PlatformTicker />
         </section>
 
-        <section className="section-wrap comparison-section" id="comparison">
+        <section className="section-wrap" id="metiers">
           <div className="section-heading">
-            <p className="eyebrow">MORE REACH. ONE WORKSPACE.</p>
-            <h2>Why teams switch from ManyChat</h2>
-            <p>Compare platform coverage and the tools your team needs.</p>
+            <p className="eyebrow">POUR TOUT LE MONDE</p>
+            <h2>Des workflows qui s’adaptent à votre métier</h2>
           </div>
-          <Reveal className="comparison-table reveal">
-            <div className="comparison-header comparison-grid">
-              <span className="comparison-label">AT A GLANCE</span>
-              <span className="comparison-brand">MANYCHAT <small>3 PLATFORMS</small></span>
-              <span className="comparison-brand sayl-column">SAYL <small>7 PLATFORMS</small></span>
-            </div>
-            {comparison.map((row, index) => (
-              <div className="comparison-row comparison-grid" key={row.feature}>
-                <span>{row.feature}</span>
-                <span className="comparison-mark">
-                  {row.manychat ? <Check aria-label="Available" /> : <X aria-label="Unavailable" />}
-                </span>
-                <span className="comparison-mark sayl-mark">
-                  <Check aria-label="Available" style={{ animationDelay: `${index * 65}ms` }} />
-                </span>
-              </div>
+
+          <div className="industry-grid">
+            {industries.map(({ icon: Icon, title, description }) => (
+              <article key={title} className="industry-card">
+                <div className="industry-icon">
+                  <Icon size={18} />
+                </div>
+                <h3>{title}</h3>
+                <p>{description}</p>
+              </article>
             ))}
-          </Reveal>
-        </section>
-
-        <section className="features-section" id="features">
-          <div className="section-wrap">
-            <div className="section-heading">
-              <p className="eyebrow">THE TOOLKIT</p>
-              <h2>Everything you need to grow on social</h2>
-            </div>
-            <div className="feature-editor">
-              <div className="feature-list" aria-label="Sayl features">
-                {features.map((feature, index) => {
-                  const Icon = feature.icon;
-                  const selected = activeFeature === index;
-                  return (
-                    <button
-                      type="button"
-                      key={feature.title}
-                      className={`feature-row${selected ? " is-active" : ""}`}
-                      onMouseEnter={() => setActiveFeature(index)}
-                      onFocus={() => setActiveFeature(index)}
-                      onClick={() => setActiveFeature(index)}
-                      aria-pressed={selected}
-                    >
-                      <span className="feature-index">{String(index + 1).padStart(2, "0")}</span>
-                      <Icon className="feature-icon" aria-hidden="true" />
-                      <span className="feature-name">{feature.title}</span>
-                      <ArrowRight className="feature-arrow" aria-hidden="true" />
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="feature-preview" aria-live="polite">
-                <div className="preview-toolbar">
-                  <span><i /> <i /> <i /></span>
-                  <span>MESSAGE PREVIEW</span>
-                  <span>0{activeFeature + 1} / 09</span>
-                </div>
-                <div className="preview-content" key={activeFeature}>
-                  <div className="preview-label">
-                    <ActiveFeatureIcon size={15} /> {features[activeFeature].label}
-                  </div>
-                  <div className="preview-message">
-                    {features[activeFeature].preview}
-                  </div>
-                  <div className="preview-tag"><span className="signal-dot" /> AUTOMATION READY</div>
-                </div>
-                <p className="preview-hint">Hover, focus, or select a feature to preview it.</p>
-              </div>
-            </div>
           </div>
         </section>
 
-        <section className="section-wrap trial-section">
-          <div className="trial-copy">
-            <p className="eyebrow">A SIMPLE WAY TO GET STARTED</p>
-            <h2>Try Sayl first.<br /><em>Choose your plan later.</em></h2>
-            <p>
-              Explore Sayl with a free trial, then continue with a paid subscription
-              that fits your team.
-            </p>
-            <p>
-              Bring your social channels, conversations, and automations together
-              in one workspace.
-            </p>
-            <Link href="/register" className="sayl-button sayl-button-primary min-h-12 px-6 trial-link">
-              Start your free trial <ArrowRight size={17} />
-            </Link>
-          </div>
-          <div className="trial-aside">
-            <div className="proof-list">
-              {proofPoints.map((point) => (
-                <div className="proof-row" key={point.label}>
-                  <span className="proof-check"><Check size={14} /></span>
-                  <span><strong>{point.label}</strong><small>{point.detail}</small></span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="steps-section">
-          <div className="section-wrap">
-            <div className="section-heading">
-              <p className="eyebrow">THREE STEPS TO GET STARTED</p>
-              <h2>Bring your conversations together</h2>
-            </div>
-            <div className="steps-grid">
-              {steps.map((step) => {
-                const Icon = step.icon;
-                return (
-                  <article className="step-card" key={step.step}>
-                    <div className="step-topline"><span>0{step.step}</span><Icon /></div>
-                    <h3>{step.title}</h3>
-                    <p>{step.desc}</p>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="section-wrap audience-section">
+        <section className="section-wrap pricing-section" id="tarifs">
           <div className="section-heading">
-            <p className="eyebrow">BUILT FOR YOUR KIND OF WORK</p>
-            <h2>Creators, businesses, and agencies</h2>
+            <p className="eyebrow">TARIFS TRANSPARENTS</p>
+            <h2>Des plans pensés pour grandir sereinement</h2>
           </div>
-          <div className="audience-grid">
-            {audiences.map((audience) => {
-              const Icon = audience.icon;
+
+          <div className="pricing-grid">
+            {plans.map((plan) => (
+              <article key={plan.name} className={`price-card ${plan.featured ? "featured" : ""}`}>
+                {plan.featured && <span className="price-badge">{plan.badge}</span>}
+                <div className="price-topline">
+                  <h3>{plan.name}</h3>
+                  <p>{plan.description}</p>
+                </div>
+                <div className="price-value">
+                  {plan.price}
+                  <span>/mois</span>
+                </div>
+                <ul>
+                  {plan.features.map((feature) => (
+                    <li key={feature}>
+                      <Check size={16} />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/register" className={`sayl-button ${plan.featured ? "sayl-button-primary" : "sayl-button-secondary"} w-full`}>
+                  {plan.featured ? "Choisir ce plan" : "Essayer"}
+                </Link>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="section-wrap faq-section" id="faq">
+          <div className="section-heading">
+            <p className="eyebrow">FAQ</p>
+            <h2>Tout ce qu’il faut savoir</h2>
+          </div>
+
+          <div className="faq-list" aria-label="Questions fréquentes">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaq === index;
               return (
-                <article className="audience-card" key={audience.title}>
-                  <Icon className="audience-icon" />
-                  <h3>{audience.title}</h3>
-                  <p>{audience.desc}</p>
-                </article>
+                <div key={faq.question} className={`faq-item ${isOpen ? "is-open" : ""}`}>
+                  <button
+                    type="button"
+                    className="faq-trigger"
+                    onClick={() => setOpenFaq(isOpen ? -1 : index)}
+                    aria-expanded={isOpen}
+                  >
+                    <span>{faq.question}</span>
+                    <ChevronDown size={18} className="faq-icon" aria-hidden="true" />
+                  </button>
+                  {isOpen && <p className="faq-answer">{faq.answer}</p>}
+                </div>
               );
             })}
           </div>
@@ -490,15 +316,17 @@ export default function Home() {
 
         <section className="section-wrap final-cta">
           <div className="cta-panel">
-            <p className="eyebrow">YOUR FREE TRIAL STARTS HERE</p>
-            <h2>Make every conversation count</h2>
+            <p className="eyebrow">PRÊT À PASSER À L’ÈRE DES CONVERSATIONS AUTOMATISÉES ?</p>
+            <h2>Transformez chaque message en opportunité.</h2>
             <p>
-              Explore Sayl, connect your accounts, and see how social automation can
-              work for your team. Continue with a paid subscription when you&apos;re ready.
+              Lancez votre essai gratuit, connectez vos comptes et donnez à votre équipe un vrai moteur de croissance sociale.
             </p>
             <div className="hero-actions">
-              <Link href="/register" className="sayl-button sayl-button-dark min-h-12 px-6">
-                Start your free trial <ArrowRight className="h-4 w-4" />
+              <Link href="/register" className="sayl-button sayl-button-primary min-h-12 px-6">
+                Créer mon compte <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href="#tarifs" className="sayl-button sayl-button-secondary min-h-12 px-6">
+                Comparer les plans
               </Link>
             </div>
           </div>
@@ -509,10 +337,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-7 sm:flex-row">
           <div className="flex items-center gap-4">
             <SaylLogo size={24} />
-            <Link href="https://zernio.com" target="_blank" rel="noopener noreferrer" className="footer-link">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/powered-by-zernio.svg" alt="Powered by Zernio" className="h-9" />
-            </Link>
+            <span className="footer-tag">Made in Tunisia</span>
           </div>
           <p>Social conversations, on your terms.</p>
         </div>

@@ -45,8 +45,8 @@ export const metadata: Metadata = {
     description: brand.tagline,
   },
   icons: {
-    icon: "/sayl-mark.svg",
-    apple: "/sayl-mark.svg",
+    icon: "/logoS.jpeg",
+    apple: "/logoS.jpeg",
   },
 };
 

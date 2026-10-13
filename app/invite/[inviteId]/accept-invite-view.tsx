@@ -61,11 +61,11 @@ export function AcceptInviteView({
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <Image
-            src="/sayl-mark.svg"
+            src="/logoS.jpeg"
             alt="Sayl"
             width={48}
             height={48}
-            className="mx-auto mb-3"
+            className="mx-auto mb-3 rounded-md object-cover"
           />
           <h1 className="text-2xl font-bold">You&apos;re invited!</h1>
           <p className="mt-2 text-sm text-muted-foreground">
