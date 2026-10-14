@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { WORKSPACE_COOKIE } from "@/lib/workspace";
 
 export async function switchWorkspace(workspaceId: string) {
@@ -50,7 +50,13 @@ export async function createWorkspace(name: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-  const { data: workspace, error } = await supabase
+  // RLS has no INSERT policy on workspaces and workspace_members only allows
+  // existing owners, so a user-scoped insert always fails. Insert via the
+  // service client instead — this only ever creates a workspace owned by the
+  // authenticated caller, same as the handle_new_user trigger.
+  const serviceClient = await createServiceClient();
+
+  const { data: workspace, error } = await serviceClient
     .from("workspaces")
     .insert({ name: trimmed, slug })
     .select("id")
@@ -61,11 +67,19 @@ export async function createWorkspace(name: string) {
   }
 
   // Add user as owner
-  await supabase.from("workspace_members").insert({
-    workspace_id: workspace.id,
-    user_id: user.id,
-    role: "owner",
-  });
+  const { error: memberError } = await serviceClient
+    .from("workspace_members")
+    .insert({
+      workspace_id: workspace.id,
+      user_id: user.id,
+      role: "owner",
+    });
+
+  if (memberError) {
+    // Clean up the orphaned workspace so retrying doesn't hit slug conflicts.
+    await serviceClient.from("workspaces").delete().eq("id", workspace.id);
+    return { error: memberError.message };
+  }
 
   // Switch to new workspace
   const cookieStore = await cookies();

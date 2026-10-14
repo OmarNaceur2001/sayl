@@ -34,11 +34,23 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const isAuthCallback = pathname === "/auth/callback";
   const isDashboard = pathname.startsWith("/dashboard");
+  const isOnboarding = pathname === "/onboarding";
   const isApiRoute = pathname.startsWith("/api/");
 
   // Auth callback and API routes (including webhooks) always pass through
   if (isAuthCallback || isApiRoute) {
     return supabaseResponse;
+  }
+
+  // Onboarding requires a session but never redirects back to it
+  if (!user && isOnboarding) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    const redirectResponse = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
   }
 
   // Redirect logged-in users away from auth pages to dashboard

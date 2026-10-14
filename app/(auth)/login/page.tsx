@@ -1,20 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { SaylLogo } from "@/components/sayl-logo";
 import { brand } from "@/lib/brand";
 
-export default function LoginPage() {
+const CALLBACK_ERRORS: Record<string, string> = {
+  auth: "That sign-in link is invalid or has expired. Please try again.",
+};
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  const callbackError = CALLBACK_ERRORS[searchParams.get("error") ?? ""];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,12 +44,13 @@ export default function LoginPage() {
   }
 
   async function handleGitHubLogin() {
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    if (error) setError(error.message);
   }
 
   return (
@@ -88,9 +96,14 @@ export default function LoginPage() {
               className="auth-input"
               placeholder="Your password"
             />
+            <Link href="/forgot-password" className="auth-forgot">
+              Forgot password?
+            </Link>
           </div>
 
-          {error && <p className="auth-error" role="alert">{error}</p>}
+          {(error || callbackError) && (
+            <p className="auth-error" role="alert">{error ?? callbackError}</p>
+          )}
 
           <button
             type="submit"
@@ -132,5 +145,13 @@ export default function LoginPage() {
         </p>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

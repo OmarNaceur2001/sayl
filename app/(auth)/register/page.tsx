@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -22,7 +23,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -37,17 +38,26 @@ export default function RegisterPage() {
       return;
     }
 
+    // Email confirmation enabled: no session yet — pushing /dashboard would
+    // bounce to /login. Show the check-your-email state instead.
+    if (!data.session) {
+      setConfirmEmail(true);
+      setLoading(false);
+      return;
+    }
+
     router.push("/dashboard");
     router.refresh();
   }
 
   async function handleGitHubLogin() {
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    if (error) setError(error.message);
   }
 
   return (
@@ -68,6 +78,17 @@ export default function RegisterPage() {
           <p>{brand.tagline}</p>
         </header>
 
+        {confirmEmail ? (
+          <div className="text-center space-y-3 py-4">
+            <p className="text-sm">
+              Check <span className="font-medium">{email}</span> for a
+              confirmation link to activate your account.
+            </p>
+            <Link href="/login" className="inline-block text-sm font-medium underline">
+              Back to sign in
+            </Link>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-field">
             <label htmlFor="name">Name</label>
@@ -129,6 +150,7 @@ export default function RegisterPage() {
             )}
           </button>
         </form>
+        )}
 
         <div className="auth-divider">Or continue with</div>
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveWorkspaceMembership } from "@/lib/workspace";
 import { requireWorkspaceRole } from "@/lib/auth/require-role";
 
 async function getWorkspaceContext(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -8,14 +9,8 @@ async function getWorkspaceContext(supabase: Awaited<ReturnType<typeof createCli
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
-
-  if (!membership?.workspace_id) return null;
+  const membership = await resolveWorkspaceMembership(supabase, user.id);
+  if (!membership) return null;
   return { workspaceId: membership.workspace_id, userId: user.id };
 }
 

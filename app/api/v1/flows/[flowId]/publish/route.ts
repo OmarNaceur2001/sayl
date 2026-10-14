@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveWorkspaceMembership } from "@/lib/workspace";
 import { requireWorkspaceRole } from "@/lib/auth/require-role";
 import { BUILDER_TRIGGER_TYPES, buildDesiredTriggers } from "@/lib/flow-triggers";
 
@@ -16,12 +17,7 @@ export async function POST(
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
+  const membership = await resolveWorkspaceMembership(supabase, user.id);
 
   if (!membership)
     return NextResponse.json({ error: "No workspace" }, { status: 404 });
