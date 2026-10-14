@@ -1,6 +1,27 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function copyCookies(from: NextResponse, to: NextResponse) {
+  from.cookies.getAll().forEach((cookie) => {
+    to.cookies.set(cookie);
+  });
+}
+
+function redirectWithCookies(
+  request: NextRequest,
+  to: string,
+  supabaseResponse: NextResponse
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = to;
+  const redirectResponse = NextResponse.redirect(url);
+  // Forward refreshed session cookies with their options (path, httpOnly,
+  // maxAge, sameSite, secure) intact — copying only name/value would strip
+  // them and break the session on redirect.
+  copyCookies(supabaseResponse, redirectResponse);
+  return redirectResponse;
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -44,37 +65,17 @@ export async function updateSession(request: NextRequest) {
 
   // Onboarding requires a session but never redirects back to it
   if (!user && isOnboarding) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    const redirectResponse = NextResponse.redirect(url);
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value);
-    });
-    return redirectResponse;
+    return redirectWithCookies(request, "/login", supabaseResponse);
   }
 
   // Redirect logged-in users away from auth pages to dashboard
   if (user && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    const redirectResponse = NextResponse.redirect(url);
-    // Forward any refreshed session cookies
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value);
-    });
-    return redirectResponse;
+    return redirectWithCookies(request, "/dashboard", supabaseResponse);
   }
 
   // Redirect unauthenticated users trying to access dashboard to login
   if (!user && isDashboard) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    const redirectResponse = NextResponse.redirect(url);
-    // Forward any refreshed session cookies
-    supabaseResponse.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie.name, cookie.value);
-    });
-    return redirectResponse;
+    return redirectWithCookies(request, "/login", supabaseResponse);
   }
 
   return supabaseResponse;
