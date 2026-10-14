@@ -9,5 +9,10 @@ port = 54322
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:3000/auth/callback**"]
 jwt_expiry = 3600
+
+# Match production: signup requires email confirmation (emails land in
+# Mailpit at http://127.0.0.1:54324 during local development).
+[auth.email]
+enable_confirmations = true
